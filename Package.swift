@@ -3,7 +3,9 @@ import PackageDescription
 
 let package = Package(
     name: "Yolk",
-    platforms: [.macOS(.v13)],
+    // macOS 14 for MainActor.assumeIsolated in the timer handlers; the menu bar
+    // app's @Observable requires it anyway.
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "YolkKit", targets: ["YolkKit"]),
         .executable(name: "yolk", targets: ["yolk"]),

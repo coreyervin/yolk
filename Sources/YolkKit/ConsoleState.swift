@@ -12,8 +12,21 @@ public enum ConsoleState: Equatable, Sendable {
     case switchedOut
     case unknown
 
+    /// Why simulation should pause, or nil when it may proceed.
+    ///
+    /// Every "should I pause?" decision routes through here, so a case added
+    /// later cannot silently start posting events into the wrong session.
+    public var pauseReason: PauseReason? {
+        switch self {
+        case .active: nil
+        case .locked: .screenLocked
+        case .switchedOut: .sessionSwitchedOut
+        case .unknown: .sessionUnknown
+        }
+    }
+
     /// True for every state except `.active`.
-    public var pausesSimulation: Bool { self != .active }
+    public var pausesSimulation: Bool { pauseReason != nil }
 }
 
 /// Keys read out of `CGSessionCopyCurrentDictionary()`.

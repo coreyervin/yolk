@@ -31,6 +31,11 @@ public struct SystemEnvironment: Sendable {
     public var createAssertion: @Sendable (String) throws -> AssertionHandle
     public var releaseAssertion: @Sendable (AssertionHandle) -> Void
 
+    /// Blocks long enough for a posted event to reach the window server, so
+    /// the idle timer can be re-read to confirm it landed. Injected rather
+    /// than a bare `usleep` so tests never actually wait.
+    public var waitForEventDelivery: @Sendable () -> Void
+
     public init(
         idleSeconds: @escaping @Sendable () -> TimeInterval,
         consoleState: @escaping @Sendable () -> ConsoleState,
@@ -41,8 +46,10 @@ public struct SystemEnvironment: Sendable {
         monotonicNow: @escaping @Sendable () -> TimeInterval,
         now: @escaping @Sendable () -> Date,
         createAssertion: @escaping @Sendable (String) throws -> AssertionHandle,
-        releaseAssertion: @escaping @Sendable (AssertionHandle) -> Void
+        releaseAssertion: @escaping @Sendable (AssertionHandle) -> Void,
+        waitForEventDelivery: @escaping @Sendable () -> Void
     ) {
+        self.waitForEventDelivery = waitForEventDelivery
         self.idleSeconds = idleSeconds
         self.consoleState = consoleState
         self.postActivity = postActivity
@@ -101,6 +108,9 @@ extension SystemEnvironment {
         },
         releaseAssertion: { handle in
             IOPMAssertionRelease(IOPMAssertionID(handle.rawValue))
-        }
+        },
+        // Posting goes through the window server asynchronously; 200ms is the
+        // original CLI's settle time before re-reading the idle timer.
+        waitForEventDelivery: { usleep(200_000) }
     )
 }
