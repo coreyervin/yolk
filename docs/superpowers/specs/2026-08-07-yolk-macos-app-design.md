@@ -415,9 +415,25 @@ actually reset.
 
 ## Distribution
 
-The app bundle **embeds the CLI binary** at `Yolk.app/Contents/MacOS/yolk`, and
-the Homebrew cask symlinks it onto `PATH` via a `binary` stanza. The embedding
-happens inside Xcode as a run-script build phase — it invokes
+The app bundle **embeds the CLI binary** at `Yolk.app/Contents/Resources/yolk`,
+and the Homebrew cask symlinks it onto `PATH` via a `binary` stanza:
+
+```ruby
+binary "#{appdir}/Yolk.app/Contents/Resources/yolk"
+```
+
+`Contents/Resources/` rather than `Contents/MacOS/`, which is where this
+document originally placed it. Xcode names the app's own main executable
+`Contents/MacOS/Yolk`, and macOS volumes are case-insensitive by default —
+`Yolk` and `yolk` in one directory are the *same file*. Copying the CLI there
+silently overwrites the app's main executable and yields a bundle that will not
+launch. Verified on APFS: writing both names in sequence leaves one file.
+
+`Contents/Resources/` is the conventional home for a bundled CLI (Sublime Text
+and VS Code both do this), it is still inside the signed bundle so it is covered
+by notarization, and it has no case collision.
+
+The embedding happens inside Xcode as a run-script build phase — it invokes
 `swift build -c release --product yolk` and copies the result into the bundle
 *before* the code-signing phase, so Xcode signs the nested binary and the outer
 bundle in the correct inside-out order. Doing this in the Makefile after export
