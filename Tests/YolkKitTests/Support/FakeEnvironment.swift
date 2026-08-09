@@ -31,6 +31,62 @@ final class AssertionRecorder: @unchecked Sendable {
     }
 }
 
+/// A mutable stand-in for the whole machine. Tests set properties directly and
+/// then drive `YolkSession.tick()` by hand — no real timers, no real sleeping.
+final class FakeSystem: @unchecked Sendable {
+    var idle: TimeInterval = 0
+    var console: ConsoleState = .active
+    var postSucceeds = true
+    /// What the verification re-read returns after a successful post. Below
+    /// 1.0 means "the event landed"; above means the grant is missing.
+    var idleAfterPost: TimeInterval = 0.2
+    var monotonic: TimeInterval = 0
+    var displaySleep: TimeInterval?
+    var wallClock = Date(timeIntervalSince1970: 1_000_000)
+
+    private(set) var postCount = 0
+    private var pendingVerification = false
+    let recorder = AssertionRecorder()
+
+    var environment: SystemEnvironment {
+        SystemEnvironment(
+            idleSeconds: { [self] in
+                // The session reads idle once to decide, then again after
+                // posting to confirm the timer actually reset.
+                if pendingVerification {
+                    pendingVerification = false
+                    return idleAfterPost
+                }
+                return idle
+            },
+            consoleState: { [self] in console },
+            postActivity: { [self] in
+                guard postSucceeds else { return false }
+                postCount += 1
+                pendingVerification = true
+                return true
+            },
+            hasPostPermission: { true },
+            requestPostPermission: {},
+            displaySleepSeconds: { [self] in displaySleep },
+            monotonicNow: { [self] in monotonic },
+            now: { [self] in wallClock },
+            createAssertion: { [self] in try recorder.create(reason: $0) },
+            releaseAssertion: { [self] in recorder.release($0) },
+            waitForEventDelivery: {}
+        )
+    }
+}
+
+@MainActor
+final class EventCollector {
+    var events: [YolkEvent] = []
+
+    func count(of event: YolkEvent) -> Int {
+        events.filter { $0 == event }.count
+    }
+}
+
 extension SystemEnvironment {
     /// A fully-faked environment. Every closure has an inert default so a test
     /// overrides only what it cares about.
@@ -55,7 +111,8 @@ extension SystemEnvironment {
             monotonicNow: monotonicNow,
             now: now,
             createAssertion: { try recorder.create(reason: $0) },
-            releaseAssertion: { recorder.release($0) }
+            releaseAssertion: { recorder.release($0) },
+            waitForEventDelivery: {}
         )
     }
 }
