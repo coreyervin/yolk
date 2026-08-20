@@ -1,1 +1,16 @@
-yolk
+# SwiftPM / Xcode build products
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserdatad
+*.xcuserstate
+
+# The legacy Makefile's root-level binary. Anchored with a leading slash so it
+# cannot also match the Sources/yolk/ directory.
+/yolk
+
+# Release artifacts
+*.dmg
+
+# macOS
+.DS_Store
