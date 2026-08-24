@@ -2,8 +2,12 @@
 .build/
 .swiftpm/
 DerivedData/
+xcuserdata/
 *.xcuserdatad
 *.xcuserstate
+# xcodebuild invoked without -derivedDataPath drops these beside the project.
+/build/
+App/build/
 
 # The legacy Makefile's root-level binary. Anchored with a leading slash so it
 # cannot also match the Sources/yolk/ directory.

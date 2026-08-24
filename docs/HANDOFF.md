@@ -13,17 +13,18 @@ open.
 
 ## Where things stand
 
-Steps 1–3 of the spec's implementation sequence are done. The engine is
-extracted, the CLI runs entirely on it, and output parity with the pre-refactor
-binary is verified rather than assumed. Nothing of the app exists yet.
+Steps 1–4 of the spec's implementation sequence are done. The engine is
+extracted, the CLI runs entirely on it with verified output parity, and the app
+target builds, launches, and embeds a signed universal CLI. The app has no real
+UI yet — that is step 5.
 
 | Spec step | Status |
 |---|---|
 | 1. Rename wakey → Yolk | done (2026-08-07, pre-git) |
 | 2. `Package.swift`, extract `YolkKit` with tests | done |
 | 3. Port CLI onto `YolkKit`, golden parity | **done (2026-08-24)** |
-| 4. Xcode project + app target, `AppModel` | **not started — next** |
-| 5. `MenuBarView` + `SettingsView` | not started |
+| 4. Xcode project + app target, `AppModel` | **done (2026-08-24)** |
+| 5. `MenuBarView` + `SettingsView` | **not started — next** |
 | 6. Icon assets | not started |
 | 7. Signing, entitlements, `make release` | not started — needs credentials |
 | 8. README rewrite, publish tap | not started — needs GitHub |
@@ -33,9 +34,17 @@ There is **no git remote**. The repo is local only.
 ## Quick start
 
 ```sh
-swift test                              # 86 tests, 10 suites — all should pass
-swift build -c release --product yolk   # build the CLI
+make test            # 114 tests, 11 suites — all should pass
+make cli             # build the CLI
+make app             # build Yolk.app with the CLI embedded and signed
+make check-version   # MARKETING_VERSION vs YolkKit.version
+make install         # CLI to ~/.local/bin
 ```
+
+`make app` needs the `-derivedDataPath` the Makefile passes. Without it
+xcodebuild puts the package products and the app in separate build roots and the
+app cannot find `YolkAppKit` — the failure reads as an unresolvable module, not
+as a path problem.
 
 Parity checks, which must keep passing:
 
@@ -60,13 +69,22 @@ Sources/YolkKit/
   SystemEnvironment.swift  the OS boundary: 11 closures, .live wiring
   PowerAssertion.swift     RAII over IOPMAssertion, released in deinit
   YolkSession.swift        the state machine — events, no exit()
+Sources/YolkAppKit/
+  AppModel.swift           @Observable wrapper over YolkSession — all app logic
+  SettingsStore.swift      UserDefaults boundary, closures like SystemEnvironment
 Sources/yolk/
   main.swift               process only: flags in, events out, signals, exit()
   ArgumentParser.swift     hand-rolled flag parsing → ParseOutcome
   ConsoleRenderer.swift    YolkEvent → stdout/stderr; owns --verbose and the tips
   Usage.swift              the frozen --help and --version text
+Sources/YolkTestSupport/   shared fakes; not a product, never linked into a build
+App/
+  Yolk.xcodeproj/          hand-written, checked in, with a shared Yolk scheme
+  Yolk/YolkApp.swift       @main — placeholder scenes until step 5
+  Yolk/Yolk.entitlements   app-sandbox false, and it must stay that way
 Tests/YolkKitTests/        49 tests — engine, driven through SystemEnvironment fakes
 Tests/YolkCLITests/        37 tests — parser, renderer, usage goldens
+Tests/YolkAppKitTests/     28 tests — AppModel
 Goldens/
   cli-help.txt, cli-version.txt          captured from the pre-refactor binary
   cli-banner-{bare,notip,flagged}.txt    the three banner cases the spec requires
@@ -184,6 +202,55 @@ accident.
 14. **`swiftLanguageMode(.v5)` is gone.** The whole package is Swift 6 mode,
     builds clean with no warnings in debug and release.
 
+### From step 4 (app target)
+
+15. **`AppModel` lives in a package target, not in the Xcode target.** The
+    spec's layout diagram puts it at `App/Yolk/AppModel.swift`, but the same
+    spec says the `.xcodeproj` should stay thin — "a shell around the package,
+    not where logic lives". `Sources/YolkAppKit/` keeps it reachable from
+    `swift test`, which is where its 28 tests run. `App/Yolk/` holds scenes and
+    nothing else. Decided 2026-08-24.
+
+16. **`@Observable` and `didSet` cannot be combined.** The settings properties
+    use explicit `access(keyPath:)` / `withMutation(keyPath:)` over
+    `@ObservationIgnored` storage. A stored property with a `didSet` that
+    assigns to itself — which is how clamping was first written — recurses
+    forever and dies with a stack overflow, because the macro rewrites the
+    stored property into a computed one and the assignment re-enters the
+    setter. Reproduced in isolation, not guessed at. Anyone adding a fourth
+    setting must follow the same pattern.
+
+17. **`YolkSession.tick()` is `package`, not internal.** `AppModel`'s tests
+    drive real check-loop iterations rather than feeding synthetic events, so
+    the wiring itself is under test. `package` keeps it out of YolkKit's public
+    API while both test targets can reach it.
+
+18. **The embed phase signs the CLI itself.** Two failures stack up here and
+    both were hit for real:
+    - `swift build` follows the host architecture, so a universal app shipped
+      an arm64-only CLI. The phase now derives `--arch` flags from Xcode's
+      `ARCHS`.
+    - A lipo-combined universal binary carries no signature, and Apple Silicon
+      SIGKILLs unsigned arm64 executables — the embedded CLI died with exit
+      137. Xcode does not fix this for you: it seals `Contents/Resources` as
+      data, not as nested code. The phase now runs `codesign` with
+      `--options runtime`, ad-hoc today and Developer ID at step 7.
+
+19. **Signing is ad-hoc (`CODE_SIGN_IDENTITY = "-"`, style Manual).** There are
+    no credentials on this Mac, and automatic signing without a team fails
+    outright. Release builds already carry the hardened runtime, so step 7 is a
+    change of identity rather than of configuration.
+
+20. **The project file is hand-written.** No XcodeGen or Tuist is installed, and
+    the spec calls for a checked-in `.xcodeproj`. Object ids are the readable
+    `1A00…0001` series rather than random hex. `plutil -lint` validates it, and
+    `make app` is the real check.
+
+21. **`make install` was broken and is fixed.** The Makefile still compiled a
+    root-level `main.swift` that step 2 moved into `Sources/yolk/`, and the CLI
+    now needs YolkKit so bare `swiftc` could not work either. Regression from
+    step 2, found in step 4; `make install` now builds through SwiftPM.
+
 ## Open questions
 
 - **Git history contains ~157MB of build artifacts.** An early `git add -A`
@@ -196,7 +263,7 @@ accident.
 
 | What | Needed at | Notes |
 |---|---|---|
-| Nothing | most of 4–6 | all local |
+| Nothing | steps 5–6 | all local; ad-hoc signing builds and launches fine |
 | Apple ID in Xcode | step 5, first real app run | free tier is enough; without a stable signing identity macOS may force re-granting Accessibility on **every rebuild**, which makes testing the permission flow miserable |
 | Developer ID **Application** cert | step 7 | not "Apple Development"; org accounts often restrict this to the Account Holder |
 | App Store Connect API key (`.p8`) | step 7 | downloadable **once**; also needs key ID + issuer UUID for `xcrun notarytool store-credentials` |
@@ -213,15 +280,20 @@ grant.
 
 ## Next action
 
-Step 4 — the Xcode project and app target:
+Step 5 — `MenuBarView` and `SettingsView`. `AppModel` already exposes
+everything both need, so this should be presentation only:
 
-- `App/Yolk.xcodeproj` checked in, referencing the local package for `YolkKit`
-- `AppModel` as an `@Observable` wrapper over `YolkSession`, translating events
-  into observable state and persisting settings to `UserDefaults`
-- The app starts **idle** — opening it puts the icon in the menu bar ready to
-  use, it does not begin a session
-- `make check-version` comparing `MARKETING_VERSION` against `YolkKit.version`
-  is worth adding here rather than waiting for step 7, since the project file
-  is being created anyway
-- The run-script build phase that embeds the CLI at
-  `Contents/Resources/yolk` must run *before* code signing — see decision 5
+- `MenuBarView` — the dropdown in the spec: status line from `isActive` /
+  `pauseReason`, `uptimeDescription(asOf:)` and `activityCount` for the detail
+  line, the Keep Mac Awake toggle (⌘K), the Stop after… submenu over
+  `AppModel.StopAfter.allCases`, and the Accessibility warning row that
+  deep-links to
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`
+- `SettingsView` — interval and threshold bounded by `YolkConfig`'s ranges,
+  `displaySleepWarning` shown inline, Accessibility status with a button
+- **Launch at Login is not built yet.** `SMAppService.mainApp` was deliberately
+  left out of step 4 to keep it focused; it needs an injectable seam in
+  `AppModel` so it can be tested, and it only registers reliably from
+  `/Applications`, which the settings pane must detect and explain
+- Views hold no logic. Anything decidable belongs in `AppModel`, where it can
+  be tested — that is the whole reason it lives in a package target

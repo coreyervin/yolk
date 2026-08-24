@@ -1,0 +1,292 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A0000000000000000000008 /* YolkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000007 /* YolkApp.swift */; };
+		1A0000000000000000000016 /* YolkAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000015 /* YolkAppKit */; };
+		1A0000000000000000000018 /* YolkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000017 /* YolkKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1A0000000000000000000006 /* Yolk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Yolk.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000000000000000000007 /* YolkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YolkApp.swift; sourceTree = "<group>"; };
+		1A0000000000000000000009 /* Yolk.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Yolk.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1A000000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000000000000000000016 /* YolkAppKit in Frameworks */,
+				1A0000000000000000000018 /* YolkKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1A0000000000000000000003 = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000004 /* Yolk */,
+				1A0000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000004 /* Yolk */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000007 /* YolkApp.swift */,
+				1A0000000000000000000009 /* Yolk.entitlements */,
+			);
+			path = Yolk;
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000006 /* Yolk.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1A0000000000000000000002 /* Yolk */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A000000000000000000000F /* Build configuration list for PBXNativeTarget "Yolk" */;
+			buildPhases = (
+				1A000000000000000000000A /* Sources */,
+				1A000000000000000000000B /* Frameworks */,
+				1A000000000000000000000C /* Resources */,
+				1A000000000000000000000D /* Embed yolk CLI */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Yolk;
+			packageProductDependencies = (
+				1A0000000000000000000015 /* YolkAppKit */,
+				1A0000000000000000000017 /* YolkKit */,
+			);
+			productName = Yolk;
+			productReference = 1A0000000000000000000006 /* Yolk.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					1A0000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 1A000000000000000000000E /* Build configuration list for PBXProject "Yolk" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1A0000000000000000000003;
+			packageReferences = (
+				1A0000000000000000000014 /* XCLocalSwiftPackageReference ".." */,
+			);
+			productRefGroup = 1A0000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1A0000000000000000000002 /* Yolk */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1A000000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1A000000000000000000000D /* Embed yolk CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed yolk CLI";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Builds the CLI and embeds it in the bundle. Runs as a build phase rather\n# than from the Makefile after export, so Xcode signs the nested binary and\n# the outer bundle in the correct inside-out order — signing the app first and\n# then adding a binary invalidates the signature.\n#\n# Contents/Resources, never Contents/MacOS: the app executable is\n# Contents/MacOS/Yolk and macOS volumes are case-insensitive by default, so a\n# CLI named 'yolk' beside it is the *same file* and silently clobbers the app.\nset -eu\n\nSCRATCH=\"$DERIVED_FILE_DIR/yolk-cli\"\n\n# Match the app's architectures exactly. Without this SwiftPM builds for the\n# host only, and a universal app would ship a CLI that Intel Macs cannot run.\nARCH_FLAGS=\"\"\nfor arch in $ARCHS; do\n\tARCH_FLAGS=\"$ARCH_FLAGS --arch $arch\"\ndone\n\n# SwiftPM must not inherit Xcode's per-target build environment, or it tries to\n# build the package for the app's exact configuration and fails.\nenv -u SDKROOT -u TOOLCHAINS -u SWIFT_EXEC -u CONFIGURATION \\\n\tswift build \\\n\t\t--package-path \"$PROJECT_DIR/..\" \\\n\t\t--scratch-path \"$SCRATCH\" \\\n\t\t--configuration release \\\n\t\t--product yolk \\\n\t\t$ARCH_FLAGS\n\n# A universal build lands under apple/Products; a single-arch one does not.\nif [ -x \"$SCRATCH/apple/Products/Release/yolk\" ]; then\n\tBUILT=\"$SCRATCH/apple/Products/Release/yolk\"\nelse\n\tBUILT=\"$SCRATCH/release/yolk\"\nfi\n\nRESOURCES=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$RESOURCES\"\ninstall -m 755 \"$BUILT\" \"$RESOURCES/yolk\"\n\n# The nested binary must be signed in its own right. SwiftPM ad-hoc signs a\n# single-arch build, but lipo-ing several together leaves the result unsigned —\n# and Apple Silicon SIGKILLs unsigned arm64 executables. Xcode will not do this\n# for us either: it seals Contents/Resources as data, not as nested code.\nSIGN_IDENTITY=\"${CODE_SIGN_IDENTITY:--}\"\nif [ \"$SIGN_IDENTITY\" = \"-\" ]; then\n\t# Ad-hoc signatures cannot carry a secure timestamp.\n\tTIMESTAMP_FLAG=\"--timestamp=none\"\nelse\n\t# Notarization requires one on every executable in the bundle.\n\tTIMESTAMP_FLAG=\"--timestamp\"\nfi\ncodesign --force --sign \"$SIGN_IDENTITY\" --options runtime \"$TIMESTAMP_FLAG\" \\\n\t\"$RESOURCES/yolk\"\n\necho \"embedded $(lipo -archs \"$RESOURCES/yolk\") CLI at $RESOURCES/yolk\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1A000000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000000000000000000008 /* YolkApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1A0000000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		1A0000000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		1A0000000000000000000012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Yolk/Yolk.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Yolk;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.coreyervin.yolk;
+				PRODUCT_NAME = Yolk;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		1A0000000000000000000013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Yolk/Yolk.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Yolk;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.coreyervin.yolk;
+				PRODUCT_NAME = Yolk;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1A000000000000000000000E /* Build configuration list for PBXProject "Yolk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000010 /* Debug */,
+				1A0000000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A000000000000000000000F /* Build configuration list for PBXNativeTarget "Yolk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000012 /* Debug */,
+				1A0000000000000000000013 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1A0000000000000000000014 /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1A0000000000000000000015 /* YolkAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YolkAppKit;
+		};
+		1A0000000000000000000017 /* YolkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YolkKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1A0000000000000000000001 /* Project object */;
+}

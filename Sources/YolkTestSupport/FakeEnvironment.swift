@@ -1,22 +1,24 @@
 import Foundation
 
-@testable import YolkKit
+import YolkKit
 
 /// Records assertion create/release traffic so lifetime can be asserted on
 /// without touching real IOKit.
-final class AssertionRecorder: @unchecked Sendable {
+public final class AssertionRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var _created: [String] = []
     private var _released: [AssertionHandle] = []
     private var _nextHandle: UInt32 = 1
 
     /// When set, `create` throws this instead of vending a handle.
-    var failure: AssertionError?
+    public init() {}
 
-    var created: [String] { lock.withLock { _created } }
-    var released: [AssertionHandle] { lock.withLock { _released } }
+    public var failure: AssertionError?
 
-    func create(reason: String) throws -> AssertionHandle {
+    public var created: [String] { lock.withLock { _created } }
+    public var released: [AssertionHandle] { lock.withLock { _released } }
+
+    public func create(reason: String) throws -> AssertionHandle {
         if let failure { throw failure }
         return lock.withLock {
             _created.append(reason)
@@ -26,29 +28,31 @@ final class AssertionRecorder: @unchecked Sendable {
         }
     }
 
-    func release(_ handle: AssertionHandle) {
+    public func release(_ handle: AssertionHandle) {
         lock.withLock { _released.append(handle) }
     }
 }
 
 /// A mutable stand-in for the whole machine. Tests set properties directly and
 /// then drive `YolkSession.tick()` by hand — no real timers, no real sleeping.
-final class FakeSystem: @unchecked Sendable {
-    var idle: TimeInterval = 0
-    var console: ConsoleState = .active
-    var postSucceeds = true
+public final class FakeSystem: @unchecked Sendable {
+    public init() {}
+
+    public var idle: TimeInterval = 0
+    public var console: ConsoleState = .active
+    public var postSucceeds = true
     /// What the verification re-read returns after a successful post. Below
     /// 1.0 means "the event landed"; above means the grant is missing.
-    var idleAfterPost: TimeInterval = 0.2
-    var monotonic: TimeInterval = 0
-    var displaySleep: TimeInterval?
-    var wallClock = Date(timeIntervalSince1970: 1_000_000)
+    public var idleAfterPost: TimeInterval = 0.2
+    public var monotonic: TimeInterval = 0
+    public var displaySleep: TimeInterval?
+    public var wallClock = Date(timeIntervalSince1970: 1_000_000)
 
-    private(set) var postCount = 0
+    public private(set) var postCount = 0
     private var pendingVerification = false
-    let recorder = AssertionRecorder()
+    public let recorder = AssertionRecorder()
 
-    var environment: SystemEnvironment {
+    public var environment: SystemEnvironment {
         SystemEnvironment(
             idleSeconds: { [self] in
                 // The session reads idle once to decide, then again after
@@ -79,10 +83,12 @@ final class FakeSystem: @unchecked Sendable {
 }
 
 @MainActor
-final class EventCollector {
-    var events: [YolkEvent] = []
+public final class EventCollector {
+    public init() {}
 
-    func count(of event: YolkEvent) -> Int {
+    public var events: [YolkEvent] = []
+
+    public func count(of event: YolkEvent) -> Int {
         events.filter { $0 == event }.count
     }
 }
@@ -90,7 +96,7 @@ final class EventCollector {
 extension SystemEnvironment {
     /// A fully-faked environment. Every closure has an inert default so a test
     /// overrides only what it cares about.
-    static func fake(
+    public static func fake(
         idleSeconds: @escaping @Sendable () -> TimeInterval = { 0 },
         consoleState: @escaping @Sendable () -> ConsoleState = { .active },
         postActivity: @escaping @Sendable () -> Bool = { true },

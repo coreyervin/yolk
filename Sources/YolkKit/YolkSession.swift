@@ -178,9 +178,10 @@ public final class YolkSession {
         }
     }
 
-    /// One iteration of the check loop. Internal so tests drive it directly
-    /// instead of waiting on real timers.
-    func tick() {
+    /// One iteration of the check loop. `package` rather than public so the
+    /// suites and `AppModel`'s tests can drive it directly instead of waiting
+    /// on real timers, without it becoming part of YolkKit's API.
+    package func tick() {
         guard case .running(var run) = state else { return }
 
         if let monotonicDeadline, environment.monotonicNow() >= monotonicDeadline {
