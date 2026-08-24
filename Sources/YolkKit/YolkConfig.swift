@@ -9,6 +9,11 @@ public struct YolkConfig: Equatable, Sendable {
     /// becomes reachable and yolk silently stops doing its job.
     public static let thresholdRange: ClosedRange<TimeInterval> = 5...300
 
+    /// The CLI's documented defaults, shared so the help text, the parser,
+    /// and the app's settings cannot drift from each other.
+    public static let defaultInterval: TimeInterval = 30
+    public static let defaultThreshold: TimeInterval = 60
+
     /// Seconds between idle checks.
     public var interval: TimeInterval
     /// Idle seconds before simulating activity.
@@ -17,8 +22,8 @@ public struct YolkConfig: Equatable, Sendable {
     public var timeout: TimeInterval?
 
     public init(
-        interval: TimeInterval = 30,
-        threshold: TimeInterval = 60,
+        interval: TimeInterval = Self.defaultInterval,
+        threshold: TimeInterval = Self.defaultThreshold,
         timeout: TimeInterval? = nil
     ) throws {
         guard Self.intervalRange.contains(interval) else {

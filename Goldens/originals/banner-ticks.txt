@@ -1,0 +1,10 @@
+yolk v1.0.0 (pid 25118)
+  ✓ system sleep prevented while running
+  ✓ simulating activity when idle ≥ 300s (checking every 5s)
+  • lock your screen (Ctrl-Cmd-Q) when you walk away — yolk pauses while locked
+Press Ctrl-C to stop.
+[14:16:51] idle 59s — real activity, nothing to do
+[14:16:56] idle 64s — real activity, nothing to do
+[14:17:01] idle 69s — real activity, nothing to do
+
+yolk: stopped — ran 0 min, simulated activity 0 times. Sleep settings restored.
