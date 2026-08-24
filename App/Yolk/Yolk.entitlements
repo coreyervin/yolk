@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Must stay false. A sandboxed app cannot post synthetic input events or
+	     shell out to pmset, which are the two things Yolk exists to do. This is
+	     also why Yolk cannot ship on the Mac App Store — see the spec's
+	     sandboxing section, which investigated and ruled it out. -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>

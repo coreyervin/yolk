@@ -41,6 +41,15 @@ public struct YolkConfig: Equatable, Sendable {
     }
 }
 
+extension YolkConfig {
+    /// The documented defaults, which are in range by construction. Lets
+    /// non-throwing contexts hold a valid config without a force-try.
+    public static let fallback: YolkConfig = {
+        // Cannot fail: both values come from the ranges declared above.
+        try! YolkConfig()
+    }()
+}
+
 public enum ConfigError: Error, Equatable {
     case intervalOutOfRange(TimeInterval)
     case thresholdOutOfRange(TimeInterval)
