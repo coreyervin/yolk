@@ -79,7 +79,10 @@ struct ArgumentParserTests {
 
     /// The exact strings the CLI has always printed. Frozen: these appear in
     /// muscle memory and in the README's troubleshooting notes.
-    @Test("rejections carry the frozen message", arguments: [
+    /// Hoisted to an explicitly-typed constant: Swift 6.4's type checker times
+    /// out trying to infer this many tuple literals inline ("unable to
+    /// type-check this expression in reasonable time").
+    static let rejectionCases: [(args: [String], message: String)] = [
         (["-i", "4"], "--interval must be 5–120 seconds"),
         (["-i", "121"], "--interval must be 5–120 seconds"),
         (["-i", "abc"], "--interval must be 5–120 seconds"),
@@ -99,7 +102,9 @@ struct ArgumentParserTests {
         (["-t"], "-t requires a value"),
         (["--nope"], "unknown option '--nope'"),
         (["extra"], "unknown option 'extra'"),
-    ])
+    ]
+
+    @Test("rejections carry the frozen message", arguments: rejectionCases)
     func rejections(args: [String], message: String) {
         #expect(throws: ArgumentError(message: message)) {
             try ArgumentParser.parse(args)

@@ -41,6 +41,11 @@ public final class AppModel {
         }
     }
 
+    /// Opens System Settings straight to the pane the user needs. A typo here
+    /// fails silently — the link simply does nothing.
+    public static let accessibilitySettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+
     private enum Key {
         static let interval = "interval"
         static let threshold = "threshold"
@@ -65,6 +70,49 @@ public final class AppModel {
     /// The display-sleep delay, but only when it beats yolk to the punch —
     /// otherwise nil. Same condition the CLI warns about.
     public private(set) var displaySleepWarning: TimeInterval?
+
+    /// False when the app is somewhere `SMAppService` cannot register from.
+    public private(set) var canEnableLaunchAtLogin = true
+    /// Why Launch at Login is unavailable or did not take, in plain language.
+    /// nil when there is nothing to say.
+    public private(set) var launchAtLoginProblem: String?
+
+    @ObservationIgnored private var storedLaunchAtLogin = false
+
+    /// Reflects the real registration state, never a cached preference — the
+    /// user can remove a login item in System Settings behind the app's back.
+    public var launchAtLogin: Bool {
+        get {
+            access(keyPath: \.launchAtLogin)
+            return storedLaunchAtLogin
+        }
+        set {
+            guard newValue != storedLaunchAtLogin || launchAtLoginProblem != nil else { return }
+            guard canEnableLaunchAtLogin else {
+                // Refused up front rather than attempted and silently reverted.
+                withMutation(keyPath: \.launchAtLogin) { storedLaunchAtLogin = false }
+                return
+            }
+            do {
+                if newValue {
+                    try loginItems.register()
+                } else {
+                    try loginItems.unregister()
+                }
+                launchAtLoginProblem = nil
+                withMutation(keyPath: \.launchAtLogin) { storedLaunchAtLogin = newValue }
+            } catch {
+                // Report the truth: the system state did not change.
+                launchAtLoginProblem =
+                    newValue
+                    ? "Yolk could not be added to your login items. \(error.localizedDescription)"
+                    : "Yolk could not be removed from your login items. \(error.localizedDescription)"
+                withMutation(keyPath: \.launchAtLogin) {
+                    storedLaunchAtLogin = loginItems.isEnabled()
+                }
+            }
+        }
+    }
 
     // MARK: Settings
 
@@ -121,10 +169,16 @@ public final class AppModel {
     private let session: YolkSession
     private let store: SettingsStore
     private let environment: SystemEnvironment
+    private let loginItems: LoginItemService
 
-    public init(environment: SystemEnvironment = .live, defaults: SettingsStore = .standard()) {
+    public init(
+        environment: SystemEnvironment = .live,
+        defaults: SettingsStore = .standard(),
+        loginItems: LoginItemService = .live
+    ) {
         self.environment = environment
         self.store = defaults
+        self.loginItems = loginItems
 
         // Stored values are validated rather than trusted: preferences can be
         // hand-edited, or written by a build with different bounds.
@@ -145,6 +199,7 @@ public final class AppModel {
             MainActor.assumeIsolated { self?.handle(event) }
         }
         refreshSystemState()
+        refreshLoginItemState()
     }
 
     // MARK: - Intent
@@ -180,6 +235,41 @@ public final class AppModel {
     public func requestAccessibilityPermission() {
         environment.requestPostPermission()
         refreshSystemState()
+    }
+
+    /// The menu's first line.
+    public var statusTitle: String {
+        guard isActive else { return "Yolk is idle" }
+        switch pauseReason {
+        case nil: return "Yolk is active"
+        case .screenLocked: return "Paused — screen locked"
+        case .sessionSwitchedOut: return "Paused — another user is using this Mac"
+        case .sessionUnknown: return "Paused — session state unavailable"
+        }
+    }
+
+    /// The menu's second line — "Awake 2h 14m · 47 nudges", or nil while idle.
+    /// Still shown while paused: the session is running, just not nudging.
+    public func statusDetail(asOf date: Date) -> String? {
+        guard let uptime = uptimeDescription(asOf: date) else { return nil }
+        let nudges =
+            switch activityCount {
+            case 0: "no nudges"
+            case 1: "1 nudge"
+            default: "\(activityCount) nudges"
+            }
+        return "Awake \(uptime) · \(nudges)"
+    }
+
+    /// Re-reads whether Yolk is a login item and whether it could be one.
+    public func refreshLoginItemState() {
+        canEnableLaunchAtLogin = loginItems.isInApplicationsFolder()
+        storedLaunchAtLogin = canEnableLaunchAtLogin && loginItems.isEnabled()
+        launchAtLoginProblem =
+            canEnableLaunchAtLogin
+            ? nil
+            : "Launch at Login needs Yolk in your /Applications folder. "
+                + "Move it there and reopen Yolk to use this."
     }
 
     /// "2h 14m", or nil while idle.
