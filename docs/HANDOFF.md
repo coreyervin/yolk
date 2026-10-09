@@ -39,9 +39,14 @@ There is **no git remote**. The repo is local only.
 make test            # 129 tests — all should pass
 make cli             # build the CLI
 make app             # build Yolk.app with the CLI embedded and signed
+make install-app     # and copy it to /Applications
 make check-version   # MARKETING_VERSION vs YolkKit.version
 make install         # CLI to ~/.local/bin
 ```
+
+The tap lives in a separate repo, cloned at `~/Code/homebrew-tap`. Releasing a
+new CLI version means bumping the version in all of the places below, tagging,
+then updating the formula's `url` and `sha256`.
 
 `make app` needs the `-derivedDataPath` the Makefile passes. Without it
 xcodebuild puts the package products and the app in separate build roots and the
@@ -268,7 +273,26 @@ accident.
     `brew audit --strict --online` passes and `brew test` passes; both were run
     against a real `brew install`, not assumed.
 
-27. **The CLI is installed twice on the dev machine.** `make install` puts it
+27. **A version bump touches nine files.** `Sources/YolkKit/Version.swift`,
+    `VersionTests`, both `MARKETING_VERSION` lines, and the five goldens that
+    carry the version in their first line. Nothing automates this, but nothing
+    needs to: `make check-version` catches the first two disagreeing and the
+    test suite catches the goldens. The captures under `Goldens/originals/`
+    deliberately keep saying 1.0.0 — they record what the pre-refactor binary
+    actually printed.
+
+28. **The embed phase must stay idempotent.** It is `alwaysOutOfDate`, so it
+    runs every build, but Xcode does not track a script phase's side effects
+    and skips re-signing the outer bundle on an incremental build. Rewriting an
+    unchanged `Contents/Resources/yolk` therefore left its sealed hash stale
+    and the app failed `codesign --verify --deep`. The phase now stamps what it
+    embedded and does nothing when the binary matches, and re-seals the bundle
+    itself when it does replace it. Every build of the app between step 4 and
+    2026-10-09 had an invalid signature; it only surfaced when copying the app
+    out of the build directory. If this phase is ever edited, re-test all
+    three cases: clean build, no-op rebuild, and a real change to the CLI.
+
+29. **The CLI is installed twice on the dev machine.** `make install` puts it
     in `~/.local/bin`, which shadows Homebrew's copy on PATH. Harmless, but it
     means `which yolk` may not be the one you just changed.
 
