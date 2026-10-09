@@ -1,6 +1,6 @@
 # Yolk — implementation handoff
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-10-09
 **Purpose:** pick this work back up cold, without re-deriving decisions.
 
 The approved design lives in
@@ -13,10 +13,10 @@ open.
 
 ## Where things stand
 
-Steps 1–4 of the spec's implementation sequence are done. The engine is
+Steps 1–5 of the spec's implementation sequence are done. The engine is
 extracted, the CLI runs entirely on it with verified output parity, and the app
-target builds, launches, and embeds a signed universal CLI. The app has no real
-UI yet — that is step 5.
+builds, launches, and has been in daily use since late August. What remains is
+presentation polish (icons) and shipping (signing, notarization, distribution).
 
 | Spec step | Status |
 |---|---|
@@ -24,8 +24,8 @@ UI yet — that is step 5.
 | 2. `Package.swift`, extract `YolkKit` with tests | done |
 | 3. Port CLI onto `YolkKit`, golden parity | **done (2026-08-24)** |
 | 4. Xcode project + app target, `AppModel` | **done (2026-08-24)** |
-| 5. `MenuBarView` + `SettingsView` | **not started — next** |
-| 6. Icon assets | not started |
+| 5. `MenuBarView` + `SettingsView` | **done (2026-10-09)** |
+| 6. Icon assets | **not started — next** |
 | 7. Signing, entitlements, `make release` | not started — needs credentials |
 | 8. README rewrite, publish tap | not started — needs GitHub |
 
@@ -34,7 +34,7 @@ There is **no git remote**. The repo is local only.
 ## Quick start
 
 ```sh
-make test            # 114 tests, 11 suites — all should pass
+make test            # 129 tests — all should pass
 make cli             # build the CLI
 make app             # build Yolk.app with the CLI embedded and signed
 make check-version   # MARKETING_VERSION vs YolkKit.version
@@ -72,6 +72,7 @@ Sources/YolkKit/
 Sources/YolkAppKit/
   AppModel.swift           @Observable wrapper over YolkSession — all app logic
   SettingsStore.swift      UserDefaults boundary, closures like SystemEnvironment
+  LoginItemService.swift   SMAppService boundary, same closure style
 Sources/yolk/
   main.swift               process only: flags in, events out, signals, exit()
   ArgumentParser.swift     hand-rolled flag parsing → ParseOutcome
@@ -80,11 +81,13 @@ Sources/yolk/
 Sources/YolkTestSupport/   shared fakes; not a product, never linked into a build
 App/
   Yolk.xcodeproj/          hand-written, checked in, with a shared Yolk scheme
-  Yolk/YolkApp.swift       @main — placeholder scenes until step 5
+  Yolk/YolkApp.swift       @main — MenuBarExtra + Settings scenes
+  Yolk/MenuBarView.swift   the dropdown
+  Yolk/SettingsView.swift  the one-pane settings window
   Yolk/Yolk.entitlements   app-sandbox false, and it must stay that way
 Tests/YolkKitTests/        49 tests — engine, driven through SystemEnvironment fakes
 Tests/YolkCLITests/        37 tests — parser, renderer, usage goldens
-Tests/YolkAppKitTests/     28 tests — AppModel
+Tests/YolkAppKitTests/     43 tests — AppModel, status strings, login item
 Goldens/
   cli-help.txt, cli-version.txt          captured from the pre-refactor binary
   cli-banner-{bare,notip,flagged}.txt    the three banner cases the spec requires
@@ -251,13 +254,57 @@ accident.
     now needs YolkKit so bare `swiftc` could not work either. Regression from
     step 2, found in step 4; `make install` now builds through SwiftPM.
 
+### From step 5 (views) and after
+
+22. **Local builds sign with a self-signed certificate.** Ad-hoc signing ties
+    the Accessibility grant to the binary's cdhash, so every rebuild silently
+    revoked it while System Settings still showed Yolk toggled on — which
+    presents as a detection bug in the Settings pane. A self-signed
+    "Yolk Local Development" certificate in the login keychain makes the
+    designated requirement `identifier + certificate root`, which is identical
+    across rebuilds. Verified by building twice and diffing the requirement.
+
+    Recreating it on a new machine, if the keychain item is ever lost:
+
+    ```sh
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -keyout k.key -out c.crt -subj "/CN=Yolk Local Development/O=Yolk" \
+      -addext "basicConstraints=critical,CA:false" \
+      -addext "keyUsage=critical,digitalSignature" \
+      -addext "extendedKeyUsage=critical,codeSigning"
+    # -certpbe/-keypbe/-macalg are required: OpenSSL 3's defaults produce a
+    # PKCS12 that macOS refuses with "MAC verification failed".
+    openssl pkcs12 -export -inkey k.key -in c.crt -out c.p12 -passout pass:yolk \
+      -name "Yolk Local Development" \
+      -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+    security import c.p12 -k ~/Library/Keychains/login.keychain-db -P yolk \
+      -T /usr/bin/codesign
+    # User-level trust is enough; no admin password needed.
+    security add-trusted-cert -r trustRoot -p codeSign \
+      -k ~/Library/Keychains/login.keychain-db c.crt
+    ```
+
+    Switching to the Developer ID at step 7 changes the requirement once more,
+    so it costs exactly one further re-grant.
+
+23. **Swift 6.4 (Xcode 27) cannot infer wide tuple-literal test arguments.**
+    The argument-rejection cases are hoisted into an explicitly-typed constant;
+    inline, the type checker gives up with "unable to type-check this
+    expression in reasonable time". Other parameterized suites still compile
+    inline, but this is the first place to look if a new one stops building.
+
+24. **History was rewritten before the first push** (2026-10-09). The early
+    `git add -A` blobs are gone: `.git` went from 157MB to 224K, every commit
+    is preserved, and the working tree hash is unchanged. All hashes before the
+    rewrite are therefore dead — any old clone or note referring to them is
+    stale. A pre-rewrite bundle was taken but lives only in a scratch
+    directory, not in the repo.
+
 ## Open questions
 
-- **Git history contains ~157MB of build artifacts.** An early `git add -A`
-  committed the whole `.build/` directory across the first commits.
-  `.gitignore` is now correct and `.build` is untracked going forward, but the
-  blobs remain in history. With no remote yet, this is still the cheap moment
-  to rewrite. Not done because it is destructive and needs a deliberate call.
+- **The README still describes the CLI only.** It predates the app entirely.
+  Rewriting it for both products is step 8's first half and is now the most
+  visible gap, since the repo is public.
 
 ## Credentials — when they are actually needed
 
@@ -267,16 +314,16 @@ accident.
 | Apple ID in Xcode | step 5, first real app run | free tier is enough; without a stable signing identity macOS may force re-granting Accessibility on **every rebuild**, which makes testing the permission flow miserable |
 | Developer ID **Application** cert | step 7 | not "Apple Development"; org accounts often restrict this to the Account Holder |
 | App Store Connect API key (`.p8`) | step 7 | downloadable **once**; also needs key ID + issuer UUID for `xcrun notarytool store-credentials` |
-| GitHub repo (+ optionally `gh`) | step 8 | `gh` is not installed; plain git works |
+| GitHub repo (+ optionally `gh`) | step 8 | done — `gh` is installed and authenticated |
 
-As of 2026-08-24 this Mac has **no** Developer ID certificate and no Xcode
-account signed in. The only keychain identity is a Mosyle MDM enrollment cert,
-which is not a signing identity.
+There is still **no** Developer ID certificate on the build machine and no
+Xcode account signed in, so there is no identity capable of a distributable
+signature. Local builds use the self-signed "Yolk Local Development"
+certificate instead — see decision 22.
 
-**Yolk is a personal project**, not PocketHealth work — it signs under a
-personal Apple Developer account. Bundle ID `io.github.coreyervin.yolk` is
-permanent; changing it after release invalidates every user's Accessibility
-grant.
+Yolk signs under a **personal** Apple Developer account. Bundle ID
+`io.github.coreyervin.yolk` is permanent; changing it after release
+invalidates every user's Accessibility grant.
 
 ## Next action
 
