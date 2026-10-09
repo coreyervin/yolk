@@ -11,7 +11,11 @@ struct AppModelTests {
     static func make(
         _ fake: FakeSystem = FakeSystem(), store: SettingsStore = .ephemeral()
     ) -> AppModel {
-        AppModel(environment: fake.environment, defaults: store)
+        // Always a fake login-item service: the default is `.live`, which would
+        // reach real SMAppService and read this machine's actual registration.
+        AppModel(
+            environment: fake.environment, defaults: store,
+            loginItems: FakeLoginItems().service)
     }
 
     // MARK: - Lifecycle
@@ -296,9 +300,11 @@ struct AppModelTests {
     @Test("the Accessibility grant is reported from the system")
     func accessibilityGrantReported() {
         let granted = AppModel(
-            environment: .fake(hasPostPermission: { true }), defaults: .ephemeral())
+            environment: .fake(hasPostPermission: { true }), defaults: .ephemeral(),
+            loginItems: FakeLoginItems().service)
         let denied = AppModel(
-            environment: .fake(hasPostPermission: { false }), defaults: .ephemeral())
+            environment: .fake(hasPostPermission: { false }), defaults: .ephemeral(),
+            loginItems: FakeLoginItems().service)
         #expect(granted.hasAccessibilityPermission)
         #expect(denied.hasAccessibilityPermission == false)
     }
@@ -333,5 +339,215 @@ struct AppModelTests {
         model.threshold = 30
         model.interval = 10  // 30 + 10 + 5 = 45 < 90
         #expect(model.displaySleepWarning == nil)
+    }
+}
+
+/// Stands in for `SMAppService.mainApp`, which cannot be exercised in a test.
+final class FakeLoginItems: @unchecked Sendable {
+    var enabled = false
+    var inApplications = true
+    var registerError: Error?
+    var unregisterError: Error?
+    private(set) var registerCalls = 0
+    private(set) var unregisterCalls = 0
+
+    struct Failure: Error {}
+
+    var service: LoginItemService {
+        LoginItemService(
+            isEnabled: { [self] in enabled },
+            register: { [self] in
+                registerCalls += 1
+                if let registerError { throw registerError }
+                enabled = true
+            },
+            unregister: { [self] in
+                unregisterCalls += 1
+                if let unregisterError { throw unregisterError }
+                enabled = false
+            },
+            isInApplicationsFolder: { [self] in inApplications })
+    }
+}
+
+@MainActor
+@Suite("AppModel — status presentation")
+struct AppModelStatusTests {
+    static func make(_ fake: FakeSystem = FakeSystem()) -> AppModel {
+        AppModel(
+            environment: fake.environment, defaults: .ephemeral(),
+            loginItems: FakeLoginItems().service)
+    }
+
+    @Test("an idle Yolk says so and offers no detail")
+    func idleStatus() {
+        let model = Self.make()
+        #expect(model.statusTitle == "Yolk is idle")
+        #expect(model.statusDetail(asOf: Date()) == nil)
+    }
+
+    @Test("an active Yolk reports uptime and nudge count")
+    func activeStatus() {
+        let fake = FakeSystem()
+        let model = Self.make(fake)
+        model.setActive(true)
+        fake.idle = 120
+        model.tickForTesting()
+        let started = try! #require(model.startedAt)
+        #expect(model.statusTitle == "Yolk is active")
+        #expect(
+            model.statusDetail(asOf: started.addingTimeInterval(8040))
+                == "Awake 2h 14m · 1 nudge")
+    }
+
+    @Test("the nudge count is pluralised", arguments: [
+        (0, "no nudges"), (1, "1 nudge"), (2, "2 nudges"), (47, "47 nudges"),
+    ])
+    func nudgePluralisation(count: Int, phrase: String) {
+        let fake = FakeSystem()
+        let model = Self.make(fake)
+        model.setActive(true)
+        fake.idle = 120
+        for _ in 0..<count { model.tickForTesting() }
+        let started = try! #require(model.startedAt)
+        #expect(model.statusDetail(asOf: started)?.hasSuffix("· \(phrase)") == true)
+    }
+
+    /// The menu says *why* it is paused; "not working" with no reason reads as
+    /// a bug rather than as the deliberate walked-away behaviour.
+    @Test("a pause names its reason", arguments: [
+        (ConsoleState.locked, "Paused — screen locked"),
+        (.switchedOut, "Paused — another user is using this Mac"),
+        (.unknown, "Paused — session state unavailable"),
+    ])
+    func pausedStatus(console: ConsoleState, title: String) {
+        let fake = FakeSystem()
+        let model = Self.make(fake)
+        model.setActive(true)
+        fake.console = console
+        model.tickForTesting()
+        #expect(model.statusTitle == title)
+    }
+
+    @Test("a paused Yolk still reports its uptime")
+    func pausedKeepsDetail() {
+        let fake = FakeSystem()
+        let model = Self.make(fake)
+        model.setActive(true)
+        fake.console = .locked
+        model.tickForTesting()
+        #expect(model.statusDetail(asOf: Date()) != nil)
+    }
+
+    /// A typo here fails silently — the deep link simply does nothing.
+    @Test("the Accessibility deep link points at the right pane")
+    func accessibilityDeepLink() {
+        #expect(
+            AppModel.accessibilitySettingsURL?.absoluteString
+                == "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+    }
+}
+
+@MainActor
+@Suite("AppModel — launch at login")
+struct AppModelLoginItemTests {
+    static func make(_ items: FakeLoginItems) -> AppModel {
+        AppModel(
+            environment: FakeSystem().environment, defaults: .ephemeral(),
+            loginItems: items.service)
+    }
+
+    @Test("the current registration state is read from the system, not stored")
+    func readsSystemState() {
+        let items = FakeLoginItems()
+        items.enabled = true
+        #expect(Self.make(items).launchAtLogin)
+    }
+
+    @Test("enabling registers the app")
+    func enablingRegisters() {
+        let items = FakeLoginItems()
+        let model = Self.make(items)
+        model.launchAtLogin = true
+        #expect(items.registerCalls == 1)
+        #expect(model.launchAtLogin)
+        #expect(model.launchAtLoginProblem == nil)
+    }
+
+    @Test("disabling unregisters the app")
+    func disablingUnregisters() {
+        let items = FakeLoginItems()
+        items.enabled = true
+        let model = Self.make(items)
+        model.launchAtLogin = false
+        #expect(items.unregisterCalls == 1)
+        #expect(model.launchAtLogin == false)
+    }
+
+    /// Registration genuinely fails outside /Applications. Silently reverting
+    /// the toggle looks like a bug; the pane has to say why.
+    @Test("running outside /Applications is detected up front, not on failure")
+    func outsideApplicationsIsDetected() {
+        let items = FakeLoginItems()
+        items.inApplications = false
+        let model = Self.make(items)
+        #expect(model.canEnableLaunchAtLogin == false)
+        #expect(model.launchAtLoginProblem != nil)
+        #expect(model.launchAtLoginProblem?.contains("/Applications") == true)
+    }
+
+    @Test("being in /Applications reports no problem")
+    func insideApplicationsIsFine() {
+        let items = FakeLoginItems()
+        items.inApplications = true
+        let model = Self.make(items)
+        #expect(model.canEnableLaunchAtLogin)
+        #expect(model.launchAtLoginProblem == nil)
+    }
+
+    @Test("enabling from outside /Applications is refused without calling the system")
+    func refusesOutsideApplications() {
+        let items = FakeLoginItems()
+        items.inApplications = false
+        let model = Self.make(items)
+        model.launchAtLogin = true
+        #expect(items.registerCalls == 0)
+        #expect(model.launchAtLogin == false)
+    }
+
+    @Test("a registration failure reverts the toggle and explains itself")
+    func registrationFailureReverts() {
+        let items = FakeLoginItems()
+        items.registerError = FakeLoginItems.Failure()
+        let model = Self.make(items)
+        model.launchAtLogin = true
+        #expect(items.registerCalls == 1)
+        #expect(model.launchAtLogin == false, "must not claim to be enabled")
+        #expect(model.launchAtLoginProblem != nil)
+    }
+
+    @Test("an unregistration failure leaves the toggle on and explains itself")
+    func unregistrationFailureReverts() {
+        let items = FakeLoginItems()
+        items.enabled = true
+        items.unregisterError = FakeLoginItems.Failure()
+        let model = Self.make(items)
+        model.launchAtLogin = false
+        #expect(model.launchAtLogin, "must not claim to be disabled")
+        #expect(model.launchAtLoginProblem != nil)
+    }
+
+    @Test("a later success clears an earlier problem")
+    func successClearsProblem() {
+        let items = FakeLoginItems()
+        items.registerError = FakeLoginItems.Failure()
+        let model = Self.make(items)
+        model.launchAtLogin = true
+        #expect(model.launchAtLoginProblem != nil)
+
+        items.registerError = nil
+        model.launchAtLogin = true
+        #expect(model.launchAtLogin)
+        #expect(model.launchAtLoginProblem == nil)
     }
 }

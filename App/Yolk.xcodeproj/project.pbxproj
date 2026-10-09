@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		1A0000000000000000000008 /* YolkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000007 /* YolkApp.swift */; };
+		1A000000000000000000001A /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000019 /* MenuBarView.swift */; };
+		1A000000000000000000001C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001B /* SettingsView.swift */; };
 		1A0000000000000000000016 /* YolkAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000015 /* YolkAppKit */; };
 		1A0000000000000000000018 /* YolkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000017 /* YolkKit */; };
 /* End PBXBuildFile section */
@@ -16,6 +18,8 @@
 		1A0000000000000000000006 /* Yolk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Yolk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000000000000000000007 /* YolkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YolkApp.swift; sourceTree = "<group>"; };
 		1A0000000000000000000009 /* Yolk.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Yolk.entitlements; sourceTree = "<group>"; };
+		1A0000000000000000000019 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		1A000000000000000000001B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +47,8 @@
 			isa = PBXGroup;
 			children = (
 				1A0000000000000000000007 /* YolkApp.swift */,
+				1A0000000000000000000019 /* MenuBarView.swift */,
+				1A000000000000000000001B /* SettingsView.swift */,
 				1A0000000000000000000009 /* Yolk.entitlements */,
 			);
 			path = Yolk;
@@ -150,6 +156,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A0000000000000000000008 /* YolkApp.swift in Sources */,
+				1A000000000000000000001A /* MenuBarView.swift in Sources */,
+				1A000000000000000000001C /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
