@@ -1,4 +1,4 @@
-yolk v1.0.0 — keep your Mac awake and Slack active
+yolk v1.0.1 — keep your Mac awake and Slack active
 
 usage: yolk [options]
 
