@@ -60,20 +60,22 @@ func write(_ ctx: CGContext, to url: URL) {
     try! rep.representation(using: .png, properties: [:])!.write(to: url)
 }
 
-/// The full-colour app icon: the egg on the rounded-square canvas macOS
-/// expects, with the standard ~10% transparent margin.
+/// The full-colour app icon: the same line-art egg the menu bar uses, kept in
+/// colour and set on the rounded-square canvas macOS expects, with the
+/// standard ~10% transparent margin. Sharing the glyph with the menu bar means
+/// Finder and the menu bar read as the same mark.
 func drawAppIcon(size: Int) -> CGContext {
     let ctx = makeContext(size: size)
     let s = CGFloat(size)
     let inset = s * 0.0977
     let plate = CGRect(x: inset, y: inset, width: s - inset * 2, height: s - inset * 2)
-    let squircle = CGPath(
-        roundedRect: plate, cornerWidth: plate.width * 0.2237,
-        cornerHeight: plate.height * 0.2237, transform: nil)
 
-    // Warm amber plate so a white egg has something to sit against.
+    // Warm amber plate, so the white egg has something to sit against.
     ctx.saveGState()
-    ctx.addPath(squircle)
+    ctx.addPath(
+        CGPath(
+            roundedRect: plate, cornerWidth: plate.width * 0.2237,
+            cornerHeight: plate.height * 0.2237, transform: nil))
     ctx.clip()
     let bg = CGGradient(
         colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -86,35 +88,30 @@ func drawAppIcon(size: Int) -> CGContext {
         end: CGPoint(x: plate.maxX, y: plate.minY), options: [])
     ctx.restoreGState()
 
-    // The egg, inset within the plate.
-    let eggBox = plate.insetBy(dx: plate.width * 0.10, dy: plate.height * 0.10)
-    let white = eggWhitePath(in: eggBox)
+    let eggBox = plate.insetBy(dx: plate.width * 0.13, dy: plate.height * 0.13)
+    let ink = CGColor(red: 0.16, green: 0.09, blue: 0.02, alpha: 1)
+    // Scaled from the canvas, not fixed, so the outline keeps its weight at
+    // every size in the icon set.
+    let stroke = s * 0.045
 
-    ctx.saveGState()
-    ctx.setShadow(
-        offset: CGSize(width: 0, height: -s * 0.012), blur: s * 0.03,
-        color: CGColor(red: 0.45, green: 0.22, blue: 0.0, alpha: 0.33))
+    let white = eggWhitePath(in: eggBox)
     ctx.addPath(white)
-    ctx.setFillColor(CGColor(red: 1, green: 0.996, blue: 0.976, alpha: 1))
+    ctx.setFillColor(CGColor(red: 1, green: 0.997, blue: 0.98, alpha: 1))
     ctx.fillPath()
-    ctx.restoreGState()
+    ctx.addPath(white)
+    ctx.setStrokeColor(ink)
+    ctx.setLineWidth(stroke)
+    ctx.setLineJoin(.round)
+    ctx.strokePath()
 
     let yolk = yolkRect(in: eggBox)
-    ctx.saveGState()
+    ctx.setFillColor(CGColor(red: 0.96, green: 0.65, blue: 0.09, alpha: 1))
     ctx.addEllipse(in: yolk)
-    ctx.clip()
-    let yolkGradient = CGGradient(
-        colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-        colors: [
-            CGColor(red: 1.00, green: 0.85, blue: 0.30, alpha: 1),
-            CGColor(red: 0.91, green: 0.47, blue: 0.05, alpha: 1),
-        ] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(
-        yolkGradient,
-        startCenter: CGPoint(x: yolk.midX - yolk.width * 0.18, y: yolk.midY + yolk.height * 0.18),
-        startRadius: 0, endCenter: CGPoint(x: yolk.midX, y: yolk.midY),
-        endRadius: yolk.width * 0.62, options: [.drawsAfterEndLocation])
-    ctx.restoreGState()
+    ctx.fillPath()
+    ctx.addEllipse(in: yolk)
+    ctx.setStrokeColor(ink)
+    ctx.setLineWidth(stroke)
+    ctx.strokePath()
     return ctx
 }
 
