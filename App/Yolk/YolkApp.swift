@@ -16,11 +16,11 @@ struct YolkApp: App {
         MenuBarExtra {
             MenuBarView(model: model, now: now)
         } label: {
-            // Placeholder symbols: the template egg icons arrive in step 6.
-            // The yolk-filled/hollow distinction the design calls for is
-            // already the shape of this — filled active, hollow idle, dimmed
-            // when paused.
-            Image(systemName: menuBarSymbol)
+            // Template images, so macOS inverts and tints them for light and
+            // dark menu bars. State reads off the yolk alone: filled when
+            // active, hollow when idle, dimmed when paused — all three survive
+            // the 18pt menu bar better than a colour or badge change would.
+            Image(model.isActive ? "MenuBarActive" : "MenuBarIdle")
                 .opacity(model.pauseReason == nil ? 1 : 0.5)
                 .onReceive(heartbeat) { tick in
                     now = tick
@@ -31,9 +31,5 @@ struct YolkApp: App {
         Settings {
             SettingsView(model: model)
         }
-    }
-
-    private var menuBarSymbol: String {
-        model.isActive ? "largecircle.fill.circle" : "circle"
     }
 }

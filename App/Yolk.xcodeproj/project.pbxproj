@@ -10,6 +10,7 @@
 		1A0000000000000000000008 /* YolkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000007 /* YolkApp.swift */; };
 		1A000000000000000000001A /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000019 /* MenuBarView.swift */; };
 		1A000000000000000000001C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001B /* SettingsView.swift */; };
+		1A000000000000000000001E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001D /* Assets.xcassets */; };
 		1A0000000000000000000016 /* YolkAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000015 /* YolkAppKit */; };
 		1A0000000000000000000018 /* YolkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000017 /* YolkKit */; };
 /* End PBXBuildFile section */
@@ -20,6 +21,7 @@
 		1A0000000000000000000009 /* Yolk.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Yolk.entitlements; sourceTree = "<group>"; };
 		1A0000000000000000000019 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		1A000000000000000000001B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1A000000000000000000001D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,6 +51,7 @@
 				1A0000000000000000000007 /* YolkApp.swift */,
 				1A0000000000000000000019 /* MenuBarView.swift */,
 				1A000000000000000000001B /* SettingsView.swift */,
+				1A000000000000000000001D /* Assets.xcassets */,
 				1A0000000000000000000009 /* Yolk.entitlements */,
 			);
 			path = Yolk;
@@ -127,6 +130,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A000000000000000000001E /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,6 +208,7 @@
 		1A0000000000000000000012 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Yolk/Yolk.entitlements;
 				CODE_SIGN_IDENTITY = "Yolk Local Development";
 				CODE_SIGN_STYLE = Manual;
@@ -231,6 +236,7 @@
 		1A0000000000000000000013 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Yolk/Yolk.entitlements;
 				CODE_SIGN_IDENTITY = "Yolk Local Development";
 				CODE_SIGN_STYLE = Manual;
