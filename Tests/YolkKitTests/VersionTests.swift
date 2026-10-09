@@ -6,6 +6,6 @@ import Testing
 struct VersionTests {
     @Test("YolkKit owns the single source of version truth")
     func versionIsTheOneTruth() {
-        #expect(YolkKit.version == "1.0.0")
+        #expect(YolkKit.version == "1.0.1")
     }
 }
