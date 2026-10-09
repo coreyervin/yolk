@@ -1,10 +1,12 @@
 PREFIX ?= $(HOME)/.local
+APPDIR ?= /Applications
 CLI := .build/release/yolk
+BUILT_APP := .build/xcode/Build/Products/Release/Yolk.app
 APP_PROJECT := App/Yolk.xcodeproj
 SCHEME := Yolk
 DERIVED := .build/xcode
 
-.PHONY: all test cli install uninstall app check-version clean
+.PHONY: all test cli install uninstall app install-app uninstall-app check-version clean
 
 all: test cli
 
@@ -28,6 +30,18 @@ uninstall:
 app:
 	xcodebuild -project $(APP_PROJECT) -scheme $(SCHEME) \
 		-configuration Release -derivedDataPath $(DERIVED) build
+
+# Installs the built app into /Applications, replacing any previous copy.
+# ditto rather than cp -R: it preserves the bundle's extended attributes and
+# code signature, which cp can quietly damage.
+install-app: app
+	@rm -rf "$(APPDIR)/Yolk.app"
+	ditto "$(BUILT_APP)" "$(APPDIR)/Yolk.app"
+	@codesign --verify --deep --strict "$(APPDIR)/Yolk.app" \
+		&& echo "installed $(APPDIR)/Yolk.app (signature intact)"
+
+uninstall-app:
+	rm -rf "$(APPDIR)/Yolk.app"
 
 # Runs first in the release pipeline so a version mismatch fails before
 # anything is built or signed. Cannot be a SwiftPM unit test: the test target
