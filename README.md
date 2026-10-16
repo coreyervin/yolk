@@ -192,7 +192,8 @@ the app's logic for the same reason: SwiftUI views aren't reachable from
 `swift test`, so nothing decidable is allowed to live in them.
 
 The CLI's output is frozen and checked against goldens captured from the
-pre-refactor binary. `docs/HANDOFF.md` records what was decided and why.
+pre-refactor binary. `docs/HANDOFF.md` records what was decided and why, and
+`docs/RELEASING.md` is the release runbook.
 
 ## Also on the list
 
