@@ -388,60 +388,25 @@ invalidates every user's Accessibility grant.
 ## Next action
 
 Step 7 — Developer ID signing and notarization. The pipeline is written and
-dry-run; all that is missing is the credentials. Three steps:
+dry-run; only the credentials are missing.
 
-1. **Get a Developer ID Application certificate** onto the build machine —
-   Xcode → Settings → Accounts → Manage Certificates → **+**. Not "Apple
-   Development". Organization accounts often restrict this to the Account
-   Holder. If the certificate lives on another Mac, export it from Keychain
-   Access as a `.p12` **with its private key** and import it here:
+**The full runbook is [`RELEASING.md`](RELEASING.md)** — prerequisites,
+certificate, notary credentials, version bump, `make release`, the DMG, the
+cask, and what changes afterwards. It is written to be followed on whichever
+Mac holds the Developer ID certificate; nothing has to be copied between
+machines.
 
-   ```sh
-   security import DeveloperID.p12 -k ~/Library/Keychains/login.keychain-db \
-     -T /usr/bin/codesign
-   ```
+Short version:
 
-2. **Store notarization credentials.** The App Store Connect API key (`.p8`)
-   is downloadable exactly once; keep it somewhere safe.
+```sh
+make signing    # confirm it resolved a Developer ID, not the local certificate
+make release    # refuses to start unless the identity and notary creds exist
+make cask       # emits the Homebrew cask with the DMG's real checksum
+```
 
-   ```sh
-   xcrun notarytool store-credentials "yolk-notary" \
-     --key AuthKey_XXXX.p8 --key-id KEYID --issuer ISSUER-UUID
-   ```
+Nothing in the project needs editing — `SIGN_IDENTITY` is resolved from the
+keychain at build time.
 
-3. **Run it.**
-
-   ```sh
-   make signing    # confirm it resolved the Developer ID, not the local cert
-   make release    # check-version, check-signing, test, archive, export,
-                   # notarize app, staple, DMG, notarize DMG, staple, verify
-   ```
-
-   Then attach `dist/Yolk-<version>.dmg` to the GitHub release, run
-   `make cask`, and paste the output into the tap as `Casks/yolk.rb`.
-
-Nothing in the project needs editing: `SIGN_IDENTITY` is resolved from the
-keychain at build time, and `make release` refuses to start unless it finds a
-Developer ID identity and stored notary credentials.
-
-Two things to expect afterwards: the app's identity changes once more, so
-Accessibility needs re-granting a final time; and `make app` on any machine
-will start preferring the Developer ID over the local self-signed certificate.
-
-Superseded, kept for reference — step 5 — `MenuBarView` and `SettingsView`. `AppModel` already exposes
-everything both need, so this should be presentation only:
-
-- `MenuBarView` — the dropdown in the spec: status line from `isActive` /
-  `pauseReason`, `uptimeDescription(asOf:)` and `activityCount` for the detail
-  line, the Keep Mac Awake toggle (⌘K), the Stop after… submenu over
-  `AppModel.StopAfter.allCases`, and the Accessibility warning row that
-  deep-links to
-  `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`
-- `SettingsView` — interval and threshold bounded by `YolkConfig`'s ranges,
-  `displaySleepWarning` shown inline, Accessibility status with a button
-- **Launch at Login is not built yet.** `SMAppService.mainApp` was deliberately
-  left out of step 4 to keep it focused; it needs an injectable seam in
-  `AppModel` so it can be tested, and it only registers reliably from
-  `/Applications`, which the settings pane must detect and explain
-- Views hold no logic. Anything decidable belongs in `AppModel`, where it can
-  be tested — that is the whole reason it lives in a package target
+One decision is deferred to that document rather than settled here: whether
+the cask replaces `Formula/yolk.rb` in the tap or sits alongside it. A formula
+and a cask of the same name in one tap compete for `brew install`.
