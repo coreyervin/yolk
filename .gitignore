@@ -18,3 +18,6 @@ App/build/
 
 # macOS
 .DS_Store
+
+# Release artifacts
+dist/

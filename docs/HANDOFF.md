@@ -298,6 +298,20 @@ accident.
 
 ### From step 5 (views) and after
 
+30. **Signing identity is resolved at build time, not hardcoded.** The
+    project defaults to ad-hoc so a fresh clone builds on any machine; the
+    Makefile then picks, in order, an explicit `SIGN_IDENTITY=`, a Developer ID
+    Application certificate, the local self-signed one, or ad-hoc. Hardcoding
+    the certificate name in the project — which is what step 5 did — makes
+    every other Mac fail the build outright with "no signing certificate
+    found". `make signing` prints what would be used.
+
+31. **`make release` notarizes twice, deliberately.** The app is notarized and
+    stapled before the DMG is assembled, then the DMG is notarized and stapled
+    too. Stapling only the DMG leaves the app itself without a ticket, so the
+    first launch after dragging it out needs a network round trip. Two
+    submissions cost a few extra minutes per release.
+
 22. **Local builds sign with a self-signed certificate.** Ad-hoc signing ties
     the Accessibility grant to the binary's cdhash, so every rebuild silently
     revoked it while System Settings still showed Yolk toggled on — which
@@ -373,20 +387,46 @@ invalidates every user's Accessibility grant.
 
 ## Next action
 
-Step 7 — Developer ID signing and notarization. It is the only thing left, and
-it unblocks the cask, a downloadable release, and the end of re-granting
-Accessibility after a rebuild. Needs an Apple Developer account
-($99/year), then:
+Step 7 — Developer ID signing and notarization. The pipeline is written and
+dry-run; all that is missing is the credentials. Three steps:
 
-- Developer ID **Application** certificate (not "Apple Development")
-- An App Store Connect API key (`.p8`), downloadable **once**, plus its key ID
-  and issuer UUID for `xcrun notarytool store-credentials`
-- Swap `CODE_SIGN_IDENTITY` from `Yolk Local Development` to the Developer ID —
-  the embed phase already switches to a secure timestamp on its own when the
-  identity starts with "Developer ID"
-- Then `make release`: check-version → test → archive → export → DMG →
-  `notarytool submit --wait` → `stapler staple`
-- Finally add the cask to the tap and point the README's install section at it
+1. **Get a Developer ID Application certificate** onto the build machine —
+   Xcode → Settings → Accounts → Manage Certificates → **+**. Not "Apple
+   Development". Organization accounts often restrict this to the Account
+   Holder. If the certificate lives on another Mac, export it from Keychain
+   Access as a `.p12` **with its private key** and import it here:
+
+   ```sh
+   security import DeveloperID.p12 -k ~/Library/Keychains/login.keychain-db \
+     -T /usr/bin/codesign
+   ```
+
+2. **Store notarization credentials.** The App Store Connect API key (`.p8`)
+   is downloadable exactly once; keep it somewhere safe.
+
+   ```sh
+   xcrun notarytool store-credentials "yolk-notary" \
+     --key AuthKey_XXXX.p8 --key-id KEYID --issuer ISSUER-UUID
+   ```
+
+3. **Run it.**
+
+   ```sh
+   make signing    # confirm it resolved the Developer ID, not the local cert
+   make release    # check-version, check-signing, test, archive, export,
+                   # notarize app, staple, DMG, notarize DMG, staple, verify
+   ```
+
+   Then attach `dist/Yolk-<version>.dmg` to the GitHub release, run
+   `make cask`, and paste the output into the tap as `Casks/yolk.rb`.
+
+Nothing in the project needs editing: `SIGN_IDENTITY` is resolved from the
+keychain at build time, and `make release` refuses to start unless it finds a
+Developer ID identity and stored notary credentials.
+
+Two things to expect afterwards: the app's identity changes once more, so
+Accessibility needs re-granting a final time; and `make app` on any machine
+will start preferring the Developer ID over the local self-signed certificate.
 
 Superseded, kept for reference — step 5 — `MenuBarView` and `SettingsView`. `AppModel` already exposes
 everything both need, so this should be presentation only:
