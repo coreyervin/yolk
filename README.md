@@ -41,6 +41,8 @@ harmless — two power assertions, same result.
 
 ## Install
 
+Yolk needs **macOS 14 (Sonoma) or later**.
+
 ### Homebrew
 
 ```sh
@@ -50,6 +52,11 @@ brew install --cask coreyervin/tap/yolk
 Installs the signed, notarized app to `/Applications` and links the `yolk` CLI
 it embeds onto your `PATH`, so this one command gets you both.
 
+```sh
+brew upgrade --cask yolk           # update to the latest release
+brew uninstall --cask --zap yolk   # remove the app, the CLI, and its settings
+```
+
 ### Download
 
 Grab `Yolk-X.Y.Z.dmg` from the
@@ -58,6 +65,8 @@ Yolk into Applications. The CLI is inside the app at
 `Yolk.app/Contents/Resources/yolk`.
 
 ### From source
+
+Needs Xcode 16 or newer.
 
 ```sh
 git clone https://github.com/coreyervin/yolk.git
@@ -121,7 +130,7 @@ yolk -v            # log every check and simulated event
 `-t` matches `caffeinate -t` semantics. The threshold is capped at 300s so
 Slack's ~10-minute away timer can never be reached by accident.
 
-Wrap a long run and have it clean up after itself:
+Keep the Mac up in the background for a fixed window:
 
 ```sh
 yolk -t 4h &        # keep the Mac up for the next four hours
@@ -141,8 +150,10 @@ Settings → Privacy & Security → Accessibility**.
   Inside tmux that's the tmux server, not your terminal — grant it to whatever
   macOS actually prompts for.
 - If the app already appears checked but Yolk still says the permission is
-  missing, remove it with **–** and add it back. A rebuild changes the app's
-  identity, and the old entry no longer matches.
+  missing, remove it with **–** and add it back. Releases are all signed with
+  the same Developer ID, so updating keeps the grant; switching between a
+  release and a source build changes the app's identity, and the old entry no
+  longer matches.
 
 ## Walking away
 

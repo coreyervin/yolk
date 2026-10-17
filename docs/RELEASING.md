@@ -17,7 +17,7 @@ One certificate, one release machine.
 
 ```sh
 xcode-select -p            # full Xcode, not just Command Line Tools
-xcodebuild -version        # 15 or newer
+xcodebuild -version        # 16 or newer (Package.swift is swift-tools 6.0)
 git clone https://github.com/coreyervin/yolk.git
 cd yolk
 make test                  # 129 tests — confirms the clone is sound
