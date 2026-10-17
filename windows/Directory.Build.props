@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- Must match Sources/YolkKit/Version.swift; `make check-version` and
          VersionTests both enforce it. -->
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <!-- Keeps the git hash out of the informational version, so YolkVersion
          reads "1.0.1" rather than "1.0.1+3f2a…". -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>

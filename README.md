@@ -234,13 +234,13 @@ no special permissions.
 > awake and that its nudge resets the idle timer. It hasn't yet had much use
 > on everyday PCs.
 
-**Getting it.** There's no Windows release yet. Every CI run on `main` attaches
-both executables as the `yolk-windows-x64` artifact — open the latest run under
-[Actions](https://github.com/coreyervin/yolk/actions), download it, and unzip.
-Or build it yourself with the .NET 10 SDK; see
-[`windows/README.md`](windows/README.md). The executables aren't signed, so the
-first launch shows "Windows protected your PC" — choose **More info → Run
-anyway**.
+**Getting it.** Download `Yolk-X.Y.Z-windows-x64.zip` from the
+[latest release](https://github.com/coreyervin/yolk/releases/latest) and unzip
+it anywhere — there's no installer. It holds `Yolk.exe`, the tray app, and
+`yolk.exe`, the CLI. Neither needs .NET installed. They aren't code-signed, so
+the first launch shows "Windows protected your PC" — choose **More info → Run
+anyway**. To build it yourself instead, see
+[`windows/README.md`](windows/README.md).
 
 **The tray app** (`Yolk.exe`) puts the egg in the system tray. **Left-click
 toggles** Yolk on and off; **right-click** opens the same menu as the Mac's —

@@ -161,6 +161,22 @@ gh release create vX.Y.Z dist/Yolk-X.Y.Z.dmg \
 
 Or attach it by hand at github.com/coreyervin/yolk/releases.
 
+### 3a. Attach the Windows build
+
+CI on `main` publishes the Windows executables for every commit. Once the run
+for the tagged commit has passed, download its `yolk-windows-x64` artifact,
+zip the two executables under a versioned name, and attach the zip:
+
+```sh
+run=$(gh run list -b main -c "$(git rev-parse vX.Y.Z^{commit})" -L 1 --json databaseId -q '.[0].databaseId')
+gh run download "$run" -n yolk-windows-x64 -D dist/windows
+(cd dist/windows && zip -j ../Yolk-X.Y.Z-windows-x64.zip cli/yolk.exe tray/Yolk.exe)
+gh release upload vX.Y.Z dist/Yolk-X.Y.Z-windows-x64.zip
+```
+
+They aren't code-signed, so first launches show SmartScreen's "Windows
+protected your PC". Signing them is a separate project.
+
 ### 4. Update the tap
 
 ```sh
