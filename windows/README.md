@@ -22,7 +22,7 @@ Yolk.Cli, Yolk.Tray  ──►  Yolk.Infrastructure  ──►  Yolk.Application
 | `src/Yolk.Application` | `Features/`, one folder per slice, each holding its request, result, and handler. `Abstractions/`, the ports. `Sessions/`, the live session the slices share. | `YolkKit`, `YolkAppKit` |
 | `src/Yolk.Infrastructure` | One Win32 adapter per port, grouped by concern (`Power/`, `Input/`, `Sessions/`, `Display/`, `Persistence/`, `Startup/`, `Native/`). The only code that calls Win32. | `SystemEnvironment.live` |
 | `src/Yolk.Cli` | `yolk.exe`: parse flags, compose, render events. Published with NativeAOT. | `Sources/yolk` |
-| `src/Yolk.Tray` | `Yolk.exe`: a WinForms shell that calls slices and redraws on events. | `App/` |
+| `src/Yolk.Tray` | `YolkApp.exe`: a WinForms shell that calls slices and redraws on events. Not `Yolk.exe` — Windows ignores case, so it would collide with the CLI's `yolk.exe`. | `App/` |
 
 The slices in `Yolk.Application/Features`:
 

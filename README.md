@@ -234,15 +234,25 @@ no special permissions.
 > awake and that its nudge resets the idle timer. It hasn't yet had much use
 > on everyday PCs.
 
-**Getting it.** Download `Yolk-X.Y.Z-windows-x64.zip` from the
+**Getting it.** With [Scoop](https://scoop.sh) or winget:
+
+```powershell
+scoop bucket add coreyervin https://github.com/coreyervin/scoop-bucket
+scoop install yolk
+
+winget install CoreyErvin.Yolk
+```
+
+Either one puts `yolk` on your `PATH`; Scoop also adds Yolk to the Start menu.
+Or download `Yolk-X.Y.Z-windows-x64.zip` from the
 [latest release](https://github.com/coreyervin/yolk/releases/latest) and unzip
-it anywhere — there's no installer. It holds `Yolk.exe`, the tray app, and
+it anywhere — there's no installer. It holds `YolkApp.exe`, the tray app, and
 `yolk.exe`, the CLI. Neither needs .NET installed. They aren't code-signed, so
 the first launch shows "Windows protected your PC" — choose **More info → Run
 anyway**. To build it yourself instead, see
 [`windows/README.md`](windows/README.md).
 
-**The tray app** (`Yolk.exe`) puts the egg in the system tray. **Left-click
+**The tray app** (`YolkApp.exe`) puts the egg in the system tray. **Left-click
 toggles** Yolk on and off; **right-click** opens the same menu as the Mac's —
 status, Keep PC Awake, Stop after…, Settings…, and Quit. The egg is **in
 colour** when active, **grey** when idle, and **faded** when paused. Settings
