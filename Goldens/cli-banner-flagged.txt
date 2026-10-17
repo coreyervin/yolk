@@ -1,4 +1,4 @@
-yolk v1.1.0 (pid %PID%)
+yolk v1.1.1 (pid %PID%)
   ✓ system sleep prevented while running
   ✓ simulating activity at a random 30–60s of idle (checking at least every 30s)
   • lock your screen (Ctrl-Cmd-Q) when you walk away — yolk pauses while locked

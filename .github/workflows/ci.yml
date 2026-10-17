@@ -105,4 +105,4 @@ jobs:
           name: yolk-windows-x64
           path: |
             dist/cli/yolk.exe
-            dist/tray/Yolk.exe
+            dist/tray/YolkApp.exe

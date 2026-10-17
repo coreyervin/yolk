@@ -161,21 +161,35 @@ gh release create vX.Y.Z dist/Yolk-X.Y.Z.dmg \
 
 Or attach it by hand at github.com/coreyervin/yolk/releases.
 
-### 3a. Attach the Windows build
+### 3a. The Windows build attaches itself
 
-CI on `main` publishes the Windows executables for every commit. Once the run
-for the tagged commit has passed, download its `yolk-windows-x64` artifact,
-zip the two executables under a versioned name, and attach the zip:
+Publishing the release triggers the **Release assets** workflow
+(`.github/workflows/release.yml`). It builds `yolk.exe` and `YolkApp.exe` from
+the release's tag on a Windows runner, checks they report the tagged version,
+and attaches `Yolk-X.Y.Z-windows-x64.zip` to the release within a few minutes.
+Its run summary prints the zip's SHA-256, which the winget manifest needs.
+
+If it fails, fix the cause and re-run it for the same release from the Actions
+tab ("Run workflow", with the tag), or:
 
 ```sh
-run=$(gh run list -b main -c "$(git rev-parse vX.Y.Z^{commit})" -L 1 --json databaseId -q '.[0].databaseId')
-gh run download "$run" -n yolk-windows-x64 -D dist/windows
-(cd dist/windows && zip -j ../Yolk-X.Y.Z-windows-x64.zip cli/yolk.exe tray/Yolk.exe)
-gh release upload vX.Y.Z dist/Yolk-X.Y.Z-windows-x64.zip
+gh workflow run release.yml -f tag=vX.Y.Z
 ```
 
-They aren't code-signed, so first launches show SmartScreen's "Windows
-protected your PC". Signing them is a separate project.
+The executables aren't code-signed, so first launches show SmartScreen's
+"Windows protected your PC". Signing them is a separate project.
+
+### 3b. Scoop and winget
+
+**Scoop** updates itself: the `coreyervin/scoop-bucket` repo checks for new
+releases every few hours and commits the new version and hash. To hurry it,
+run its **Update** workflow by hand.
+
+**winget** needs a pull request to `microsoft/winget-pkgs` for each version —
+copy the previous version's folder under `manifests/c/CoreyErvin/Yolk/`, bump
+`PackageVersion`, the URL, `InstallerSha256` (from the run summary above), and
+`ReleaseDate`, and open the PR. Microsoft's bots validate it and a moderator
+merges it, usually within a day or two.
 
 ### 4. Update the tap
 

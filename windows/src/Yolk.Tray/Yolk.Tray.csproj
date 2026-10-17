@@ -5,7 +5,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>Yolk</AssemblyName>
+    <!-- Not "Yolk": Windows ignores case, so Yolk.exe and the CLI's yolk.exe
+         couldn't sit in the same folder. -->
+    <AssemblyName>YolkApp</AssemblyName>
     <RootNamespace>Yolk.Tray</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\Yolk.ico</ApplicationIcon>

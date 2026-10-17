@@ -1,0 +1,62 @@
+name: Release assets
+
+# When a release is published, build the Windows executables from its tag and
+# attach them as one zip. The Mac DMG is built, notarized, and attached by hand
+# on the machine holding the Developer ID — see docs/RELEASING.md.
+on:
+  release:
+    types: [published]
+  # Rebuild and re-attach for an existing release, e.g. after a failed run.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build from and attach to, e.g. v1.1.1
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test windows/Yolk.slnx -c Release
+
+      - name: Publish the CLI (NativeAOT) and the tray app
+        run: |
+          dotnet publish windows/src/Yolk.Cli -c Release -r win-x64 -o dist/cli
+          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/tray
+          New-Item -ItemType Directory dist/stage | Out-Null
+          Copy-Item dist/cli/yolk.exe, dist/tray/YolkApp.exe dist/stage/
+
+      # A release built from the wrong tag, or before a version bump, would
+      # otherwise ship executables that report a different version.
+      - name: Check the version matches the tag
+        run: |
+          $expected = "yolk v$($env:TAG.TrimStart('v'))"
+          $actual = & dist/stage/yolk.exe --version
+          if ($actual -ne $expected) { throw "yolk.exe reports '$actual', expected '$expected'" }
+
+      - name: Zip and attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = "Yolk-$($env:TAG.TrimStart('v'))-windows-x64.zip"
+          Compress-Archive -Path dist/stage/* -DestinationPath $zip
+          gh release upload $env:TAG $zip --clobber
+          "SHA-256 $((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower())  $zip" | Tee-Object -Append $env:GITHUB_STEP_SUMMARY
