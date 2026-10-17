@@ -1,10 +1,10 @@
-using Yolk.Core;
+using Yolk.Application.Abstractions;
 
 namespace Yolk.TestSupport;
 
 /// <summary>
-/// Records what the session scheduled without ever running it. Tests drive
-/// Tick() themselves, and can fire a timer by hand when that is the point.
+/// Records what was scheduled without ever running it. Tests drive
+/// CheckActivity themselves, and can fire a timer by hand when that is the point.
 /// </summary>
 public sealed class ManualScheduler : IScheduler
 {

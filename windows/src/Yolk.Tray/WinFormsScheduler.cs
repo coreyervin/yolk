@@ -1,4 +1,4 @@
-using Yolk.Core;
+using Yolk.Application.Abstractions;
 
 namespace Yolk.Tray;
 

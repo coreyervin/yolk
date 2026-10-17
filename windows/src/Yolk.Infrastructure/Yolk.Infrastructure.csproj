@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows adapters for Application's ports: power requests, idle
+       time, SendInput, session state, the power plan, and the registry. The
+       only project that calls Win32. Plain net10.0, not net10.0-windows, so
+       the CLI stays NativeAOT-friendly; the platform analyzer still flags any
+       call made without a Windows check. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yolk.Application\Yolk.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yolk.Infrastructure.Tests" />
+  </ItemGroup>
+
+</Project>

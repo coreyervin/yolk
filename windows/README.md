@@ -8,18 +8,46 @@ keyboard.
 
 ## Layout
 
-| Project | What it is | Mac counterpart |
-|---|---|---|
-| `src/Yolk.Core` | The engine: config, session, events. No OS calls. | `YolkKit` |
-| `src/Yolk.Platform.Windows` | `Win32Environment` — the only code that calls Win32 | `SystemEnvironment.live` |
-| `src/Yolk.Cli` | `yolk.exe`, published with NativeAOT | `Sources/yolk` |
-| `src/Yolk.AppCore` | `AppModel` — the tray app's logic, unit-tested | `YolkAppKit` |
-| `src/Yolk.Tray` | `Yolk.exe`, a thin WinForms tray shell | `App/` |
-| `tests/*` | xUnit suites, ported from the Swift ones | `Tests/` |
+Clean Architecture, with the use cases as vertical slices. Dependencies only
+point inward:
 
-Platform code stays in `Yolk.Platform.Windows` and `Yolk.Tray`. Everything
-else builds and tests on any OS, including the tray app, which cross-compiles
-from a Mac.
+```
+Yolk.Cli, Yolk.Tray  ──►  Yolk.Infrastructure  ──►  Yolk.Application  ──►  Yolk.Domain
+   (presentation)          (Win32 adapters)          (slices + ports)       (rules)
+```
+
+| Project | What it holds | Mac counterpart |
+|---|---|---|
+| `src/Yolk.Domain` | `KeepAwakeSession`, the rules as a pure aggregate: readings in, events out. `YolkConfig`, `StopAfter`, durations. References nothing. | `YolkKit` |
+| `src/Yolk.Application` | `Features/`, one folder per slice, each holding its request, result, and handler. `Abstractions/`, the ports. `Sessions/`, the live session the slices share. | `YolkKit`, `YolkAppKit` |
+| `src/Yolk.Infrastructure` | One Win32 adapter per port, grouped by concern (`Power/`, `Input/`, `Sessions/`, `Display/`, `Persistence/`, `Startup/`, `Native/`). The only code that calls Win32. | `SystemEnvironment.live` |
+| `src/Yolk.Cli` | `yolk.exe`: parse flags, compose, render events. Published with NativeAOT. | `Sources/yolk` |
+| `src/Yolk.Tray` | `Yolk.exe`: a WinForms shell that calls slices and redraws on events. | `App/` |
+
+The slices in `Yolk.Application/Features`:
+
+| Slice | Requests |
+|---|---|
+| `KeepAwake` | `StartKeepAwake`, `StopKeepAwake`, `ReconfigureKeepAwake` |
+| `ActivityCheck` | `CheckActivity`, run on every timer tick |
+| `Settings` | `GetSettings`, `UpdateSettings`, `ApplyStoredSettings` |
+| `LaunchAtSignIn` | `GetLaunchAtSignIn`, `SetLaunchAtSignIn` |
+| `Status` | `GetStatus`, what the tray icon and menu show |
+
+Presentation resolves a slice's `ICommandHandler<>` or `IQueryHandler<,>` from
+Microsoft.Extensions.DependencyInjection and calls `Handle`. There's no
+mediator library. `AddApplication()` and `AddInfrastructure()` list every
+registration explicitly, which keeps the CLI NativeAOT-compatible.
+
+**Adding a slice:** add a folder under `Features/` with the request, its
+result, and an `internal` handler. Register the handler in
+`Yolk.Application/DependencyInjection.cs`, and add any new port to
+`Abstractions/Ports.cs` with its Win32 adapter in Infrastructure.
+`Yolk.Architecture.Tests` fails if a handler sits outside `Features/` or isn't
+registered, or if native code shows up outside Infrastructure.
+
+Tests mirror the layers. `Yolk.Application.Tests` drives each slice through
+the real `AddApplication()` container with the ports faked (`TestHost`).
 
 ## Build and test
 
@@ -49,21 +77,24 @@ Or skip building: every CI run on `main` uploads both executables as the
 - **Version.** `Directory.Build.props` must match
   `Sources/YolkKit/Version.swift`. `make check-version` and `VersionTests` both
   enforce it.
-- **Behavior.** `YolkSession` is a line-for-line port. A change to the engine
-  on one side needs the same change, and the same test, on the other.
+- **Behavior.** The Mac's `YolkSession` is split here into the
+  `KeepAwakeSession` aggregate (the rules) and the `KeepAwake` and
+  `ActivityCheck` slices (the orchestration). Together they behave the same,
+  and `CheckActivityTests` ports the Mac's session tests. A change to the
+  engine on one side needs the same change, and the same test, on the other.
 
 ## How the Mac mechanisms map
 
-| | Mac | Windows |
+| Port | Mac | Windows adapter |
 |---|---|---|
-| Stay awake | `IOPMAssertion` (`PreventUserIdleSystemSleep`) | `PowerSetRequest(PowerRequestSystemRequired)` |
-| Idle time | `CGEventSource` | `GetLastInputInfo` |
-| Nudge | Mouse-moved event at the cursor | `SendInput`, zero-distance mouse move |
-| Locked / switched out | `CGSessionCopyCurrentDictionary` | `WTSQuerySessionInformation(WTSSessionInfoEx)` |
-| Display sleep | `pmset -g` | Active power plan's "turn off display after" |
+| Stay awake (`IPowerRequestService`) | `IOPMAssertion` (`PreventUserIdleSystemSleep`) | `PowerSetRequest(PowerRequestSystemRequired)` |
+| Idle time (`IIdleTimeProvider`) | `CGEventSource` | `GetLastInputInfo` |
+| Nudge (`IInputSimulator`) | Mouse-moved event at the cursor | `SendInput`, zero-distance mouse move |
+| Locked / switched out (`ISessionStateProvider`) | `CGSessionCopyCurrentDictionary` | `WTSQuerySessionInformation(WTSSessionInfoEx)` |
+| Display sleep (`IDisplaySettingsProvider`) | `pmset -g` | Active power plan's "turn off display after" |
 | Permission | Accessibility grant | None needed |
-| Launch at login | `SMAppService` | `HKCU\…\CurrentVersion\Run` |
-| Settings | `UserDefaults` | `HKCU\Software\Yolk` |
+| Launch at sign-in (`IStartupRegistration`) | `SMAppService` | `HKCU\…\CurrentVersion\Run` |
+| Settings (`ISettingsRepository`) | `UserDefaults` | `HKCU\Software\Yolk` |
 
 ## Testing on a real PC
 

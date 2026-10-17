@@ -1,5 +1,7 @@
 using System.Globalization;
-using Yolk.Core;
+using Yolk.Domain;
+using Yolk.Domain.Configuration;
+using Yolk.Domain.Sessions;
 
 namespace Yolk.Cli;
 

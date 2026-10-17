@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Yolk.Core;
+using Yolk.Application.Abstractions;
 
 namespace Yolk.Cli;
 
