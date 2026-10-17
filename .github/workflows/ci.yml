@@ -47,3 +47,62 @@ jobs:
           touch "$RUNNER_TEMP/dist/Yolk-$version.dmg"
           make -s cask DIST="$RUNNER_TEMP/dist" > "$RUNNER_TEMP/Casks/yolk.rb"
           brew style "$RUNNER_TEMP/Casks/yolk.rb"
+
+  # The C# Windows port in windows/. Tests run here too, but this is the only
+  # place the real Win32 calls execute until someone tries it on a real PC.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test windows/Yolk.slnx -c Release
+
+      - name: Publish the CLI (NativeAOT) and the tray app
+        run: |
+          dotnet publish windows/src/Yolk.Cli -c Release -r win-x64 -o dist/cli
+          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/tray
+
+      # Runs the published yolk.exe for a few seconds against the real Win32
+      # calls — the power request, session query, idle timer, and SendInput —
+      # under NativeAOT, which is where a bad P/Invoke would surface.
+      - name: Smoke-test yolk.exe
+        run: |
+          $yolk = "dist/cli/yolk.exe"
+          & $yolk --version
+          if ($LASTEXITCODE -ne 0) { throw "--version failed" }
+          & $yolk --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "--help failed" }
+
+          $p = Start-Process $yolk -ArgumentList '-t', '7s', '-v', '-i', '5', '--threshold', '5' `
+            -NoNewWindow -PassThru -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+          $null = $p.Handle  # caches the handle so ExitCode is readable later
+          Start-Sleep -Seconds 3
+          $requests = powercfg /requests | Out-String
+          Write-Output $requests
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "yolk did not exit on its timeout" }
+
+          Write-Output "--- stdout"; Get-Content out.txt
+          Write-Output "--- stderr"; Get-Content err.txt
+          if ($p.ExitCode -ne 0) { throw "yolk exited with $($p.ExitCode)" }
+          if (-not (Select-String -Path out.txt -Pattern 'timeout reached' -Quiet)) {
+            throw "yolk did not report reaching its timeout"
+          }
+          if ($requests -notmatch 'keeping the PC awake') {
+            throw "yolk's power request did not appear in powercfg /requests"
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: yolk-windows-x64
+          path: |
+            dist/cli/yolk.exe
+            dist/tray/Yolk.exe

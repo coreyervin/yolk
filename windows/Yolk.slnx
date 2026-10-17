@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Yolk.AppCore/Yolk.AppCore.csproj" />
+    <Project Path="src/Yolk.Cli/Yolk.Cli.csproj" />
+    <Project Path="src/Yolk.Core/Yolk.Core.csproj" />
+    <Project Path="src/Yolk.Platform.Windows/Yolk.Platform.Windows.csproj" />
+    <Project Path="src/Yolk.Tray/Yolk.Tray.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Yolk.AppCore.Tests/Yolk.AppCore.Tests.csproj" />
+    <Project Path="tests/Yolk.Cli.Tests/Yolk.Cli.Tests.csproj" />
+    <Project Path="tests/Yolk.Core.Tests/Yolk.Core.Tests.csproj" />
+    <Project Path="tests/Yolk.TestSupport/Yolk.TestSupport.csproj" />
+  </Folder>
+</Solution>
