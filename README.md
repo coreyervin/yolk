@@ -12,8 +12,16 @@ the machine awake for exactly as long as you need it, and nothing longer.
 It also keeps Slack and Microsoft Teams from quietly marking you away while you
 sit there watching the agent work.
 
-Yolk runs on **macOS** (signed, notarized, and on Homebrew) and on **Windows**
-(a newer C# port — see [Windows](#windows)).
+Yolk runs on **macOS** and **Windows**, one command to install on either:
+
+```sh
+brew install --cask coreyervin/tap/yolk                                # macOS
+```
+
+```powershell
+scoop bucket add coreyervin https://github.com/coreyervin/scoop-bucket  # Windows
+scoop install yolk
+```
 
 Two mechanisms, both running the whole time Yolk is on:
 
@@ -50,8 +58,8 @@ harmless — two power assertions, same result.
 
 ## Install
 
-Yolk for the Mac needs **macOS 14 (Sonoma) or later**. On Windows, see
-[Windows](#windows).
+Yolk for the Mac needs **macOS 14 (Sonoma) or later**. For Windows, install
+with [Scoop](#scoop-recommended) — see [Windows](#windows).
 
 ### Homebrew
 
@@ -234,23 +242,47 @@ no special permissions.
 > awake and that its nudge resets the idle timer. It hasn't yet had much use
 > on everyday PCs.
 
-**Getting it.** With [Scoop](https://scoop.sh) or winget:
+### Scoop (recommended)
+
+[Scoop](https://scoop.sh) is the Windows counterpart of Homebrew, and the
+easiest way to get Yolk and keep it current. If you don't have it yet, install
+it from a regular (non-admin) PowerShell window:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+```
+
+Then add Yolk's bucket and install:
 
 ```powershell
 scoop bucket add coreyervin https://github.com/coreyervin/scoop-bucket
 scoop install yolk
-
-winget install CoreyErvin.Yolk
 ```
 
-Either one puts `yolk` on your `PATH`; Scoop also adds Yolk to the Start menu.
-Or download `Yolk-X.Y.Z-windows-x64.zip` from the
-[latest release](https://github.com/coreyervin/yolk/releases/latest) and unzip
-it anywhere — there's no installer. It holds `YolkApp.exe`, the tray app, and
-`yolk.exe`, the CLI. Neither needs .NET installed. They aren't code-signed, so
-the first launch shows "Windows protected your PC" — choose **More info → Run
-anyway**. To build it yourself instead, see
-[`windows/README.md`](windows/README.md).
+That adds **Yolk** to the Start menu and puts `yolk` (the CLI) and `YolkApp`
+(the tray app) on your `PATH`. No admin rights, and nothing else to install.
+
+```powershell
+scoop update yolk      # update to the latest release
+scoop uninstall yolk   # remove it
+```
+
+The bucket picks up each new Yolk release automatically within a few hours.
+
+### Other ways
+
+- **winget** — `winget install CoreyErvin.Yolk`, once the package is approved
+  ([pending](https://github.com/microsoft/winget-pkgs/pull/454916)).
+- **Download** — unzip `Yolk-X.Y.Z-windows-x64.zip` from the
+  [latest release](https://github.com/coreyervin/yolk/releases/latest)
+  anywhere; there's no installer. It holds `YolkApp.exe`, the tray app, and
+  `yolk.exe`, the CLI, and neither needs .NET installed. They aren't
+  code-signed, so the first launch shows "Windows protected your PC" — choose
+  **More info → Run anyway**.
+- **From source** — see [`windows/README.md`](windows/README.md).
+
+### Using it
 
 **The tray app** (`YolkApp.exe`) puts the egg in the system tray. **Left-click
 toggles** Yolk on and off; **right-click** opens the same menu as the Mac's —
