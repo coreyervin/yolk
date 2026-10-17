@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch or PR supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
+
+      - name: Version sources agree
+        run: make check-version
+
+      - name: Test
+        run: make test
+
+      - name: Build the CLI
+        run: make cli
+
+      # No certificate on the runner, so this signs ad-hoc — which is the point:
+      # a fresh clone with no signing identity must still build.
+      - name: Build the app
+        run: make app
+
+  cask:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # `make cask` only checksums the DMG, so an empty placeholder is enough to
+      # render the template and hold it to `brew style`.
+      - name: Cask template passes brew style
+        run: |
+          version=$(make -s check-version | sed 's/^check-version: //')
+          mkdir -p "$RUNNER_TEMP/dist" "$RUNNER_TEMP/Casks"
+          touch "$RUNNER_TEMP/dist/Yolk-$version.dmg"
+          make -s cask DIST="$RUNNER_TEMP/dist" > "$RUNNER_TEMP/Casks/yolk.rb"
+          brew style "$RUNNER_TEMP/Casks/yolk.rb"
