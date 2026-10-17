@@ -159,6 +159,7 @@ release: check-version check-signing test
 	@ln -s /Applications $(DIST)/dmg/Applications
 	hdiutil create -volname "Yolk $(VERSION)" -srcfolder $(DIST)/dmg \
 		-ov -format UDZO $(DIST)/Yolk-$(VERSION).dmg
+	codesign --sign "$(SIGN_IDENTITY)" --timestamp $(DIST)/Yolk-$(VERSION).dmg
 	@echo "==> notarizing the disk image"
 	xcrun notarytool submit $(DIST)/Yolk-$(VERSION).dmg \
 		--keychain-profile "$(NOTARY_PROFILE)" --wait
