@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The engine. No OS calls: everything platform-specific sits behind
+       ISystemEnvironment and IScheduler, so this builds and tests anywhere. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yolk.Core.Tests" />
+    <!-- AppModel drives Tick() directly in its own tests. -->
+    <InternalsVisibleTo Include="Yolk.AppCore" />
+  </ItemGroup>
+
+</Project>

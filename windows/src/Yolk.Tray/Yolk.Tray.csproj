@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The system tray app: a thin WinForms shell over AppModel. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>Yolk</AssemblyName>
+    <RootNamespace>Yolk.Tray</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Assets\Yolk.ico</ApplicationIcon>
+    <!-- LibraryImport (DestroyIcon in TrayIcons) generates unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Yolk.png" LogicalName="Yolk.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yolk.Core\Yolk.Core.csproj" />
+    <ProjectReference Include="..\Yolk.AppCore\Yolk.AppCore.csproj" />
+    <ProjectReference Include="..\Yolk.Platform.Windows\Yolk.Platform.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
