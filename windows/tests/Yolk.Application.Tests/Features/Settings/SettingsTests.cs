@@ -14,7 +14,7 @@ public class SettingsTests
         using var host = new TestHost();
         var settings = host.GetSettings();
         Assert.Equal(30, settings.Interval);
-        Assert.Equal(60, settings.Threshold);
+        Assert.Equal(new ThresholdRange(30, 60), settings.Threshold);
         Assert.Equal(StopAfter.Never, settings.StopAfter);
     }
 
@@ -24,7 +24,7 @@ public class SettingsTests
         var repository = new FakeSettingsRepository();
         using (var first = new TestHost())
         {
-            first.UpdateSettings(interval: 15, threshold: 120, stopAfter: StopAfter.Hours4);
+            first.UpdateSettings(interval: 15, thresholdMin: 90, thresholdMax: 120, stopAfter: StopAfter.Hours4);
             repository.Stored = first.Settings.Stored;
         }
 
@@ -33,34 +33,66 @@ public class SettingsTests
         var settings = second.GetSettings();
 
         Assert.Equal(15, settings.Interval);
-        Assert.Equal(120, settings.Threshold);
+        Assert.Equal(new ThresholdRange(90, 120), settings.Threshold);
         Assert.Equal(StopAfter.Hours4, settings.StopAfter);
     }
 
     [Theory]
-    [InlineData(4.0, 60.0)]
-    [InlineData(500.0, 60.0)]
-    [InlineData(30.0, 1.0)]
-    [InlineData(30.0, 301.0)]
-    [InlineData(double.NaN, 60.0)]
-    public void OutOfRangeStoredSettingsFallBackToTheDefaults(double interval, double threshold)
+    [InlineData(4.0)]
+    [InlineData(500.0)]
+    [InlineData(double.NaN)]
+    public void AnOutOfRangeStoredIntervalFallsBackToTheDefault(double interval)
     {
         using var host = new TestHost();
-        host.Settings.Stored = new StoredSettings(interval, threshold, null);
+        host.Settings.Stored = new StoredSettings(interval, null, null, null, null);
+        Assert.Equal(30, host.GetSettings().Interval);
+    }
 
-        var settings = host.GetSettings();
+    [Theory]
+    [InlineData(60.0, 30.0)]   // inverted
+    [InlineData(1.0, 60.0)]    // bottom out of bounds
+    [InlineData(30.0, 900.0)]  // top out of bounds
+    [InlineData(double.NaN, 60.0)]
+    public void ABadStoredRangeFallsBackToTheDefault(double low, double high)
+    {
+        using var host = new TestHost();
+        host.Settings.Stored = new StoredSettings(null, low, high, null, null);
+        Assert.Equal(new ThresholdRange(30, 60), host.GetSettings().Threshold);
+    }
 
-        Assert.True(YolkConfig.IsValidInterval(settings.Interval));
-        Assert.True(YolkConfig.IsValidThreshold(settings.Threshold));
-        Assert.Equal(YolkConfig.IsValidInterval(interval) ? interval : 30, settings.Interval);
-        Assert.Equal(YolkConfig.IsValidThreshold(threshold) ? threshold : 60, settings.Threshold);
+    /// <summary>
+    /// Before thresholds were ranges, one number was stored. An upgrade keeps
+    /// it, as a fixed point.
+    /// </summary>
+    [Fact]
+    public void APreRangeStoredThresholdCarriesOverAsAFixedPoint()
+    {
+        using var host = new TestHost();
+        host.Settings.Stored = new StoredSettings(null, null, null, LegacyThreshold: 90, null);
+        Assert.Equal(ThresholdRange.Fixed(90), host.GetSettings().Threshold);
+    }
+
+    [Fact]
+    public void AStoredRangeWinsOverAPreRangeValue()
+    {
+        using var host = new TestHost();
+        host.Settings.Stored = new StoredSettings(null, 20, 40, LegacyThreshold: 90, null);
+        Assert.Equal(new ThresholdRange(20, 40), host.GetSettings().Threshold);
+    }
+
+    [Fact]
+    public void MovingOneEndOfTheRangePastTheOtherCarriesItAlong()
+    {
+        using var host = new TestHost();
+        Assert.Equal(ThresholdRange.Fixed(90), host.UpdateSettings(thresholdMin: 90).Threshold);
+        Assert.Equal(ThresholdRange.Fixed(20), host.UpdateSettings(thresholdMax: 20).Threshold);
     }
 
     [Fact]
     public void AnUnrecognisedStoredStopAfterFallsBackToNever()
     {
         using var host = new TestHost();
-        host.Settings.Stored = new StoredSettings(null, null, StopAfter: null);
+        host.Settings.Stored = new StoredSettings(null, null, null, null, StopAfter: null);
         Assert.Equal(StopAfter.Never, host.GetSettings().StopAfter);
     }
 
@@ -68,21 +100,21 @@ public class SettingsTests
     public void ApplyingStoredSettingsConfiguresTheNextSession()
     {
         using var host = new TestHost();
-        host.Settings.Stored = new StoredSettings(15, 45, StopAfter.Hour1);
+        host.Settings.Stored = new StoredSettings(15, 20, 45, null, StopAfter.Hour1);
 
         host.ApplyStoredSettings();
         host.Start();
 
-        Assert.Equal(new YolkEvent.Started(new YolkConfig(15, 45, 3600)), host.Events.Events[0]);
+        Assert.Equal(new YolkEvent.Started(new YolkConfig(15, new ThresholdRange(20, 45), 3600)), host.Events.Events[0]);
     }
 
     [Fact]
     public void AnOutOfRangeChangeIsClampedIntoRange()
     {
         using var host = new TestHost();
-        var settings = host.UpdateSettings(interval: 1, threshold: 9999);
+        var settings = host.UpdateSettings(interval: 1, thresholdMin: 0, thresholdMax: 9999);
         Assert.Equal(5, settings.Interval);
-        Assert.Equal(300, settings.Threshold);
+        Assert.Equal(new ThresholdRange(5, 300), settings.Threshold);
     }
 
     [Fact]
@@ -115,19 +147,21 @@ public class SettingsTests
         Assert.True(status.IsActive);
         Assert.Equal(1, status.ActivityCount);
         Assert.Equal(startedAt, status.StartedAt);
-        Assert.Equal(TimeSpan.FromSeconds(15), Assert.Single(host.Scheduler.Live).Period);
+        Assert.Single(host.Scheduler.Live).Fire();
+        Assert.Equal(TimeSpan.FromSeconds(15), Assert.Single(host.Scheduler.Live).DueTime);
     }
 
     [Fact]
     public void ChangingThresholdMidSessionTakesEffectImmediately()
     {
         using var host = new TestHost();
+        host.UpdateSettings(thresholdMin: 60);
         host.System.Idle = 45;
         host.Start();
         host.Tick();
         Assert.Equal(0, host.Status().ActivityCount);
 
-        host.UpdateSettings(threshold: 30);
+        host.UpdateSettings(thresholdMax: 30);
         host.Tick();
 
         Assert.Equal(1, host.Status().ActivityCount);

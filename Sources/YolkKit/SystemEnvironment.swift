@@ -36,6 +36,10 @@ public struct SystemEnvironment: Sendable {
     /// than a bare `usleep` so tests never actually wait.
     public var waitForEventDelivery: @Sendable () -> Void
 
+    /// A random number in `0..<1`, for placing each nudge within the
+    /// threshold range. Injected so tests can pin where the nudges land.
+    public var randomUnit: @Sendable () -> Double
+
     public init(
         idleSeconds: @escaping @Sendable () -> TimeInterval,
         consoleState: @escaping @Sendable () -> ConsoleState,
@@ -47,9 +51,11 @@ public struct SystemEnvironment: Sendable {
         now: @escaping @Sendable () -> Date,
         createAssertion: @escaping @Sendable (String) throws -> AssertionHandle,
         releaseAssertion: @escaping @Sendable (AssertionHandle) -> Void,
-        waitForEventDelivery: @escaping @Sendable () -> Void
+        waitForEventDelivery: @escaping @Sendable () -> Void,
+        randomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0..<1) }
     ) {
         self.waitForEventDelivery = waitForEventDelivery
+        self.randomUnit = randomUnit
         self.idleSeconds = idleSeconds
         self.consoleState = consoleState
         self.postActivity = postActivity

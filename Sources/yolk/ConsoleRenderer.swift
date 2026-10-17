@@ -15,7 +15,7 @@ final class ConsoleRenderer {
     static let tips = [
         "yolk -t 8h stops on its own after 8 hours. Also takes 90m, 45s, or 1d.",
         "yolk -v logs every idle check and simulated event, if you want to watch it work.",
-        "yolk --threshold 30 nudges sooner, if Slack still slips to away on you.",
+        "yolk --threshold 20-40 nudges sooner, if Slack or Teams still slips to away.",
         "yolk -i 15 checks more often, for a tighter idle window.",
         "Lock with Ctrl-Cmd-Q when you step away — yolk pauses, so Slack shows you away honestly.",
         "yolk --help lists every option.",
@@ -66,12 +66,12 @@ final class ConsoleRenderer {
             self.config = config
             startedAt = now()
             renderBanner(config)
-        case .checked(let idle):
+        case .checked(let idle, let nudgeAt):
             lastCheckedIdle = idle
-            // At or above the threshold the engine goes on to simulate, and
-            // the simulated line reports it — logging here too would double up.
-            if idle < (config?.threshold ?? 0) {
-                vlog("idle \(Int(idle))s — real activity, nothing to do")
+            // At or above the target the engine goes on to simulate, and the
+            // simulated line reports it — logging here too would double up.
+            if idle < nudgeAt {
+                vlog("idle \(Int(idle))s — next nudge at \(Int(nudgeAt))s idle")
             }
         case .activitySimulated(let total):
             activityCount = total
@@ -96,12 +96,12 @@ final class ConsoleRenderer {
                 "⚠ Could not construct a synthetic input event — Slack may mark you away. Is the window server reachable?"
             )
         case .displaySleepTooSoon(let displaySleep):
-            let worstCase = (config?.threshold ?? 0) + (config?.interval ?? 0) + 5
+            let worstCase = (config?.threshold.upperBound ?? 0) + 5
             err("""
                 ⚠ Your display sleeps after \(Int(displaySleep / 60)) min — sooner than yolk would act
                   with these settings (up to \(Int(worstCase))s of idle). Once the display sleeps
-                  and locks, yolk pauses and Slack will mark you away. Lower --threshold/
-                  --interval, or raise display sleep in System Settings → Lock Screen.
+                  and locks, yolk pauses and Slack will mark you away. Lower --threshold,
+                  or raise display sleep in System Settings → Lock Screen.
                 """)
         case .stopped(let reason):
             renderSummary(reason)
@@ -136,7 +136,7 @@ final class ConsoleRenderer {
         out("""
             yolk v\(YolkKit.version) (pid \(pid))
               ✓ system sleep prevented while running
-              ✓ simulating activity when idle ≥ \(Int(config.threshold))s (checking every \(Int(config.interval))s)
+              ✓ simulating activity \(Self.nudgeDescription(config.threshold)) (checking at least every \(Int(config.interval))s)
               • lock your screen (Ctrl-Cmd-Q) when you walk away — yolk pauses while locked
             """)
         if let timeout = config.timeout {
@@ -146,6 +146,13 @@ final class ConsoleRenderer {
             // For day-plus timeouts a bare time of day reads as "today".
             out("  • auto-exit at \(format(estimatedEnd, includingDate: timeout >= 86400))")
         }
+    }
+
+    /// "at a random 30–60s of idle", or "when idle ≥ 45s" for a fixed point.
+    static func nudgeDescription(_ threshold: ClosedRange<TimeInterval>) -> String {
+        threshold.lowerBound == threshold.upperBound
+            ? "when idle ≥ \(Int(threshold.lowerBound))s"
+            : "at a random \(Int(threshold.lowerBound))–\(Int(threshold.upperBound))s of idle"
     }
 
     private func renderSummary(_ reason: StopReason) {

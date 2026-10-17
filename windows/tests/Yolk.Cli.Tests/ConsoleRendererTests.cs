@@ -80,11 +80,19 @@ public class ConsoleRendererTests
     }
 
     [Fact]
-    public void TheBannerReportsTheConfiguredThresholdAndIntervalAsWholeSeconds()
+    public void TheBannerReportsAFixedThresholdAndTheIntervalAsWholeSeconds()
     {
         var (renderer, spy) = Make();
-        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 5, threshold: 300)));
-        Assert.Contains("simulating activity when idle ≥ 300s (checking every 5s)", spy.Out);
+        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 5, threshold: ThresholdRange.Fixed(300))));
+        Assert.Contains("simulating activity when idle ≥ 300s (checking at least every 5s)", spy.Out);
+    }
+
+    [Fact]
+    public void TheBannerReportsAThresholdRangeAsARandomPoint()
+    {
+        var (renderer, spy) = Make();
+        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 15, threshold: new ThresholdRange(20, 40))));
+        Assert.Contains("simulating activity at a random 20–40s of idle (checking at least every 15s)", spy.Out);
     }
 
     [Fact]
@@ -115,12 +123,12 @@ public class ConsoleRendererTests
     // ── Verbose tick logging ───────────────────────────────────────────────
 
     [Fact]
-    public void VerboseLogsABelowThresholdCheckAsRealActivity()
+    public void VerboseLogsABelowTargetCheckWithWhenTheNextNudgeIsDue()
     {
         var (renderer, spy) = Make(verbose: true);
         renderer.Handle(new YolkEvent.Started(new YolkConfig()));
-        renderer.Handle(new YolkEvent.Checked(59.7));
-        Assert.EndsWith($"[{Stamp(PinnedNow)}] idle 59s — real activity, nothing to do\n", spy.Out);
+        renderer.Handle(new YolkEvent.Checked(12.7, NudgeAt: 47.3));
+        Assert.EndsWith($"[{Stamp(PinnedNow)}] idle 12s — next nudge at 47s idle\n", spy.Out);
     }
 
     [Fact]
@@ -129,8 +137,8 @@ public class ConsoleRendererTests
         var (renderer, spy) = Make(verbose: false);
         renderer.Handle(new YolkEvent.Started(new YolkConfig()));
         var afterBanner = spy.Out;
-        renderer.Handle(new YolkEvent.Checked(12));
-        renderer.Handle(new YolkEvent.Checked(90));
+        renderer.Handle(new YolkEvent.Checked(12, NudgeAt: 45));
+        renderer.Handle(new YolkEvent.Checked(90, NudgeAt: 45));
         renderer.Handle(new YolkEvent.ActivitySimulated(1));
         renderer.Handle(new YolkEvent.Paused(PauseReason.ScreenLocked));
         renderer.Handle(new YolkEvent.Resumed());
@@ -142,18 +150,18 @@ public class ConsoleRendererTests
     {
         var (renderer, spy) = Make(verbose: true);
         renderer.Handle(new YolkEvent.Started(new YolkConfig()));
-        renderer.Handle(new YolkEvent.Checked(61.2));
+        renderer.Handle(new YolkEvent.Checked(61.2, NudgeAt: 45));
         renderer.Handle(new YolkEvent.ActivitySimulated(7));
         Assert.EndsWith($"[{Stamp(PinnedNow)}] idle 61s — simulated activity (#7)\n", spy.Out);
     }
 
     [Fact]
-    public void AnAtOrAboveThresholdCheckLogsNothingOnItsOwn()
+    public void AnAtOrAboveTargetCheckLogsNothingOnItsOwn()
     {
         var (renderer, spy) = Make(verbose: true);
         renderer.Handle(new YolkEvent.Started(new YolkConfig()));
         var afterBanner = spy.Out;
-        renderer.Handle(new YolkEvent.Checked(60));
+        renderer.Handle(new YolkEvent.Checked(45, NudgeAt: 45));
         Assert.Equal(afterBanner, spy.Out);
     }
 
@@ -204,13 +212,13 @@ public class ConsoleRendererTests
     public void TheDisplaySleepWarningStatesBothTheSleepDelayAndYolksWorstCase()
     {
         var (renderer, spy) = Make();
-        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 30, threshold: 60)));
-        renderer.Handle(new YolkEvent.DisplaySleepTooSoon(120));
+        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 30, threshold: new ThresholdRange(30, 90))));
+        renderer.Handle(new YolkEvent.DisplaySleepTooSoon(60));
         Assert.Equal("""
-            ⚠ Your display sleeps after 2 min — sooner than yolk would act
+            ⚠ Your display sleeps after 1 min — sooner than yolk would act
               with these settings (up to 95s of idle). Once the display sleeps
-              and locks, yolk pauses and Slack will mark you away. Lower --threshold/
-              --interval, or raise "Turn off my screen after" in Settings → System → Power.
+              and locks, yolk pauses and Slack will mark you away. Lower --threshold,
+              or raise "Turn off my screen after" in Settings → System → Power.
 
             """.ReplaceLineEndings("\n"), spy.Err);
     }
@@ -293,7 +301,7 @@ public class ConsoleRendererTests
     public void TheDisplaySleepWarningLandsBetweenTheBannerAndTheTip()
     {
         var (renderer, spy) = Make(invokedBare: true);
-        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 30, threshold: 60)));
+        renderer.Handle(new YolkEvent.Started(new YolkConfig(interval: 30)));
         renderer.Handle(new YolkEvent.DisplaySleepTooSoon(120));
         renderer.RenderStartupTail();
 

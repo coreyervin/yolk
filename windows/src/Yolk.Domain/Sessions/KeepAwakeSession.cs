@@ -6,10 +6,10 @@ namespace Yolk.Domain.Sessions;
 /// The keep-awake session: Yolk's rules, with no I/O.
 /// </summary>
 /// <remarks>
-/// The aggregate never reads the clock, the idle timer, or the screen lock
-/// itself. The application layer takes those readings and passes them in;
-/// the session decides what they mean and answers with the domain event to
-/// publish, if any. The rules match the Mac's <c>YolkSession</c>.
+/// The aggregate never reads the clock, the idle timer, the screen lock, or a
+/// random number generator itself. The application layer takes those readings
+/// and passes them in; the session decides what they mean and answers with the
+/// domain event to publish, if any. The rules match the Mac's <c>YolkSession</c>.
 /// </remarks>
 public sealed class KeepAwakeSession(YolkConfig config)
 {
@@ -24,6 +24,9 @@ public sealed class KeepAwakeSession(YolkConfig config)
     /// </summary>
     public const double TimerSlackSeconds = 5;
 
+    /// <summary>The soonest a check is ever scheduled, so timers never spin.</summary>
+    public const double MinimumCheckDelaySeconds = 0.5;
+
     private double? _monotonicDeadline;
     private bool _warnedNoEffect;
     private bool _warnedPostFailed;
@@ -33,10 +36,19 @@ public sealed class KeepAwakeSession(YolkConfig config)
     /// <summary>The current run, or null while stopped.</summary>
     public RunState? Run { get; private set; }
 
+    /// <summary>
+    /// The idle time the next nudge waits for: a random point in the
+    /// threshold range, chosen afresh after every nudge.
+    /// </summary>
+    public double NudgeTarget { get; private set; }
+
     public bool IsRunning => Run is not null;
 
-    /// <summary>Begins a run. Returns null if one is already under way.</summary>
-    public YolkEvent.Started? Start(DateTime now, double monotonicNow)
+    /// <summary>
+    /// Begins a run. <paramref name="randomUnit"/> (0 to 1) places the first
+    /// nudge within the threshold range. Returns null if a run is under way.
+    /// </summary>
+    public YolkEvent.Started? Start(DateTime now, double monotonicNow, double randomUnit)
     {
         if (IsRunning)
         {
@@ -44,6 +56,7 @@ public sealed class KeepAwakeSession(YolkConfig config)
         }
         _warnedNoEffect = false;
         _warnedPostFailed = false;
+        NudgeTarget = Config.Threshold.PointAt(randomUnit);
         _monotonicDeadline = Config.Timeout is { } timeout ? monotonicNow + timeout : null;
         Run = new RunState(
             StartedAt: now,
@@ -74,20 +87,30 @@ public sealed class KeepAwakeSession(YolkConfig config)
             ? new YolkEvent.DisplaySleepTooSoon(displaySleepSeconds!.Value)
             : null;
 
-    /// <summary>The same check, for a config that isn't running yet.</summary>
+    /// <summary>
+    /// The same check, for a config that isn't running yet. Checks are timed
+    /// to the nudge, so the worst case is the top of the threshold range plus
+    /// timer slack.
+    /// </summary>
     public static bool DisplaySleepBeatsYolk(YolkConfig config, double? displaySleepSeconds) =>
-        displaySleepSeconds is { } sleep && config.Threshold + config.Interval + TimerSlackSeconds >= sleep;
+        displaySleepSeconds is { } sleep && config.Threshold.Max + TimerSlackSeconds >= sleep;
 
     /// <summary>
     /// Applies new settings without disturbing the start time or activity
-    /// count. A changed timeout restarts the countdown from now.
+    /// count. A changed timeout restarts the countdown from now; a changed
+    /// threshold range picks a new nudge point in it.
     /// </summary>
-    public Reconfiguration Reconfigure(YolkConfig newConfig, DateTime now, double monotonicNow)
+    public Reconfiguration Reconfigure(YolkConfig newConfig, DateTime now, double monotonicNow, double randomUnit)
     {
         var change = new Reconfiguration(
             TimeoutChanged: newConfig.Timeout != Config.Timeout,
-            IntervalChanged: newConfig.Interval != Config.Interval);
+            IntervalChanged: newConfig.Interval != Config.Interval,
+            ThresholdChanged: newConfig.Threshold != Config.Threshold);
         Config = newConfig;
+        if (change.ThresholdChanged)
+        {
+            NudgeTarget = newConfig.Threshold.PointAt(randomUnit);
+        }
 
         if (Run is { } run && change.TimeoutChanged)
         {
@@ -136,7 +159,14 @@ public sealed class KeepAwakeSession(YolkConfig config)
 
     /// <summary>Whether this much idle time calls for a nudge.</summary>
     public bool ShouldNudge(double idleSeconds) =>
-        IsRunning && !IsPaused && idleSeconds >= Config.Threshold;
+        IsRunning && !IsPaused && idleSeconds >= NudgeTarget;
+
+    /// <summary>
+    /// How long until idle reaches the nudge point, so the next check can be
+    /// timed to land on it. Never more than the interval.
+    /// </summary>
+    public double DelayUntilNudge(double idleSeconds) =>
+        Math.Min(Config.Interval, Math.Max(NudgeTarget - idleSeconds, MinimumCheckDelaySeconds));
 
     /// <summary>
     /// The nudge could not be posted at all. Reported once per run.
@@ -153,15 +183,17 @@ public sealed class KeepAwakeSession(YolkConfig config)
 
     /// <summary>
     /// The nudge was posted; <paramref name="idleAfterSeconds"/> is the idle
-    /// timer re-read afterwards. Concurrent real input can make a failed
-    /// nudge look landed, which is fine: real input means someone is there.
+    /// timer re-read afterwards, and <paramref name="randomUnit"/> places the
+    /// next nudge. Concurrent real input can make a failed nudge look landed,
+    /// which is fine: real input means someone is there.
     /// </summary>
-    public YolkEvent? RecordNudge(double idleAfterSeconds)
+    public YolkEvent? RecordNudge(double idleAfterSeconds, double randomUnit)
     {
         if (Run is not { } run)
         {
             return null;
         }
+        NudgeTarget = Config.Threshold.PointAt(randomUnit);
         if (idleAfterSeconds < NudgeLandedBelowSeconds)
         {
             Run = run with { ActivityCount = run.ActivityCount + 1 };
@@ -185,7 +217,7 @@ public sealed record RunState(
     PauseReason? PausedBecause);
 
 /// <summary>What a reconfiguration changed, so the caller knows to reschedule.</summary>
-public readonly record struct Reconfiguration(bool TimeoutChanged, bool IntervalChanged)
+public readonly record struct Reconfiguration(bool TimeoutChanged, bool IntervalChanged, bool ThresholdChanged)
 {
-    public bool TimersChanged => TimeoutChanged || IntervalChanged;
+    public bool TimersChanged => TimeoutChanged || IntervalChanged || ThresholdChanged;
 }

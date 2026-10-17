@@ -47,6 +47,9 @@ public final class FakeSystem: @unchecked Sendable {
     public var monotonic: TimeInterval = 0
     public var displaySleep: TimeInterval?
     public var wallClock = Date(timeIntervalSince1970: 1_000_000)
+    /// Where each nudge lands within the threshold range: 0 is the bottom,
+    /// just under 1 the top. Pinned so tests know exactly when a nudge is due.
+    public var randomUnit: Double = 0
 
     public private(set) var postCount = 0
     private var pendingVerification = false
@@ -77,7 +80,8 @@ public final class FakeSystem: @unchecked Sendable {
             now: { [self] in wallClock },
             createAssertion: { [self] in try recorder.create(reason: $0) },
             releaseAssertion: { [self] in recorder.release($0) },
-            waitForEventDelivery: {}
+            waitForEventDelivery: {},
+            randomUnit: { [self] in randomUnit }
         )
     }
 }
@@ -105,6 +109,7 @@ extension SystemEnvironment {
         displaySleepSeconds: @escaping @Sendable () -> TimeInterval? = { nil },
         monotonicNow: @escaping @Sendable () -> TimeInterval = { 0 },
         now: @escaping @Sendable () -> Date = { Date(timeIntervalSince1970: 0) },
+        randomUnit: @escaping @Sendable () -> Double = { 0 },
         recorder: AssertionRecorder = AssertionRecorder()
     ) -> SystemEnvironment {
         SystemEnvironment(
@@ -118,7 +123,8 @@ extension SystemEnvironment {
             now: now,
             createAssertion: { try recorder.create(reason: $0) },
             releaseAssertion: { recorder.release($0) },
-            waitForEventDelivery: {}
+            waitForEventDelivery: {},
+            randomUnit: randomUnit
         )
     }
 }

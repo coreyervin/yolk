@@ -123,10 +123,10 @@ public class GetStatusTests
     public void TighteningTheSettingsClearsTheDisplaySleepWarning()
     {
         using var host = new TestHost();
-        host.System.DisplaySleep = 90; // 60 + 30 + 5 = 95 ≥ 90, so the defaults warn
+        host.System.DisplaySleep = 60; // top of 30–60, + 5 = 65 ≥ 60, so the defaults warn
         Assert.NotNull(host.Status().DisplaySleepWarning);
 
-        host.UpdateSettings(threshold: 30);
+        host.UpdateSettings(thresholdMax: 50); // 55 < 60
 
         Assert.Null(host.Status().DisplaySleepWarning);
     }

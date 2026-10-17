@@ -101,8 +101,9 @@ Or skip building: every CI run on `main` uploads both executables as the
 CI proves it builds, the logic is right, and the Win32 calls don't crash.
 These need a real session:
 
-1. **The nudge resets the idle timer.** Run `yolk -v --threshold 5 -i 5` and
-   leave the mouse alone. Expect `simulated activity (#1)`, `(#2)`, …, not a
+1. **The nudge resets the idle timer.** Run `yolk -v --threshold 5-15` and
+   leave the mouse alone. Expect `simulated activity (#1)`, `(#2)`, … at
+   irregular 5–15s gaps, with `next nudge at Ns idle` lines between, and no
    "had no effect" warning. This is the riskiest assumption in the port.
 2. **Slack stays active.** With the above running, Slack should not go away
    after its ~10 minutes. Teams too, if you use it.

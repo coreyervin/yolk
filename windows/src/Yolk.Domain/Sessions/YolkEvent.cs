@@ -25,8 +25,11 @@ public abstract record YolkEvent
 
     public sealed record Started(YolkConfig Config) : YolkEvent;
 
-    /// <summary>Emitted every tick that isn't paused.</summary>
-    public sealed record Checked(double Idle) : YolkEvent;
+    /// <summary>
+    /// Emitted every tick that isn't paused. <paramref name="NudgeAt"/> is the
+    /// idle time the next nudge is waiting for.
+    /// </summary>
+    public sealed record Checked(double Idle, double NudgeAt) : YolkEvent;
 
     public sealed record Paused(PauseReason Reason) : YolkEvent;
 

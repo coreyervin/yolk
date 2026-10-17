@@ -1,4 +1,5 @@
 using Yolk.Cli;
+using Yolk.Domain.Configuration;
 
 namespace Yolk.Cli.Tests;
 
@@ -13,31 +14,32 @@ public class ArgumentParserTests
     {
         var invocation = Run();
         Assert.Equal(30, invocation.Config.Interval);
-        Assert.Equal(60, invocation.Config.Threshold);
+        Assert.Equal(new ThresholdRange(30, 60), invocation.Config.Threshold);
         Assert.Null(invocation.Config.Timeout);
         Assert.False(invocation.Verbose);
         Assert.True(invocation.InvokedBare);
     }
 
-    public static TheoryData<string[], double, double, double?, bool> Spellings => new()
+    public static TheoryData<string[], double, double, double, double?, bool> Spellings => new()
     {
-        { ["-i", "45"], 45, 60, null, false },
-        { ["--interval", "45"], 45, 60, null, false },
-        { ["--threshold", "90"], 30, 90, null, false },
-        { ["-t", "8h"], 30, 60, 28800, false },
-        { ["--timeout", "90m"], 30, 60, 5400, false },
-        { ["-v"], 30, 60, null, true },
-        { ["--verbose"], 30, 60, null, true },
+        { ["-i", "45"], 45, 30, 60, null, false },
+        { ["--interval", "45"], 45, 30, 60, null, false },
+        { ["--threshold", "90"], 30, 90, 90, null, false },
+        { ["--threshold", "20-40"], 30, 20, 40, null, false },
+        { ["-t", "8h"], 30, 30, 60, 28800, false },
+        { ["--timeout", "90m"], 30, 30, 60, 5400, false },
+        { ["-v"], 30, 30, 60, null, true },
+        { ["--verbose"], 30, 30, 60, null, true },
     };
 
     [Theory]
     [MemberData(nameof(Spellings))]
     public void BothSpellingsOfEveryFlagAreAccepted(
-        string[] args, double interval, double threshold, double? timeout, bool verbose)
+        string[] args, double interval, double thresholdMin, double thresholdMax, double? timeout, bool verbose)
     {
         var invocation = Run(args);
         Assert.Equal(interval, invocation.Config.Interval);
-        Assert.Equal(threshold, invocation.Config.Threshold);
+        Assert.Equal(new ThresholdRange(thresholdMin, thresholdMax), invocation.Config.Threshold);
         Assert.Equal(timeout, invocation.Config.Timeout);
         Assert.Equal(verbose, invocation.Verbose);
     }
@@ -60,7 +62,7 @@ public class ArgumentParserTests
     {
         var invocation = Run("-i", "15", "--threshold", "30", "-t", "45s", "-v");
         Assert.Equal(15, invocation.Config.Interval);
-        Assert.Equal(30, invocation.Config.Threshold);
+        Assert.Equal(ThresholdRange.Fixed(30), invocation.Config.Threshold);
         Assert.Equal(45, invocation.Config.Timeout);
         Assert.True(invocation.Verbose);
     }
@@ -81,6 +83,12 @@ public class ArgumentParserTests
         { ["--threshold", "4"], ThresholdMessage },
         { ["--threshold", "301"], ThresholdMessage },
         { ["--threshold", "nope"], ThresholdMessage },
+        { ["--threshold", "4-60"], ThresholdMessage },
+        { ["--threshold", "30-301"], ThresholdMessage },
+        { ["--threshold", "30-"], ThresholdMessage },
+        { ["--threshold", "-30"], ThresholdMessage },
+        { ["--threshold", "10-20-30"], ThresholdMessage },
+        { ["--threshold", "60-30"], "--threshold range must run from low to high, e.g. 30-60" },
         { ["-t", "abc"], "invalid duration 'abc' — use e.g. 8h, 90m, 45s, or seconds" },
         { ["-t", "0"], "invalid duration '0' — use e.g. 8h, 90m, 45s, or seconds" },
         { ["-t", "-5m"], "invalid duration '-5m' — use e.g. 8h, 90m, 45s, or seconds" },
@@ -110,7 +118,7 @@ public class ArgumentParserTests
     [InlineData("5", 5)]
     [InlineData("300", 300)]
     public void ThresholdBoundariesAreInclusive(string value, double expected) =>
-        Assert.Equal(expected, Run("--threshold", value).Config.Threshold);
+        Assert.Equal(ThresholdRange.Fixed(expected), Run("--threshold", value).Config.Threshold);
 
     /// <summary>
     /// Each flag is validated as it is read, so the leftmost bad flag is the

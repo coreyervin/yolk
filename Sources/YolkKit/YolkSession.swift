@@ -13,8 +13,9 @@ public enum StopReason: Equatable, Sendable {
 
 public enum YolkEvent: Equatable, Sendable {
     case started(YolkConfig)
-    /// Emitted every tick that isn't paused; frontends decide whether to show it.
-    case checked(idle: TimeInterval)
+    /// Emitted every tick that isn't paused; frontends decide whether to show
+    /// it. `nudgeAt` is the idle time the next nudge is waiting for.
+    case checked(idle: TimeInterval, nudgeAt: TimeInterval)
     case paused(PauseReason)
     case resumed
     case activitySimulated(total: Int)
@@ -67,10 +68,21 @@ public final class YolkSession {
 
     private let environment: SystemEnvironment
     private let timers = TimerBox()
+    /// The check timer, rescheduled after every check. Owned by `timers`.
+    private var ticker: DispatchSourceTimer?
     private var assertion: PowerAssertion?
     private var monotonicDeadline: TimeInterval?
     private var warnedPermissionMissing = false
     private var warnedPostFailed = false
+
+    /// The idle time the next nudge waits for: a random point in the
+    /// threshold range, chosen afresh after every nudge.
+    package private(set) var nudgeTarget: TimeInterval = 0
+
+    /// How long until the next check, as decided by the last one. Checks are
+    /// timed to land when idle reaches `nudgeTarget`, and are never more than
+    /// `interval` apart.
+    package private(set) var nextCheckDelay: TimeInterval = 1
 
     public init(config: YolkConfig, environment: SystemEnvironment = .live) {
         self.config = config
@@ -81,6 +93,7 @@ public final class YolkSession {
         guard case .stopped = state else { return }
         warnedPermissionMissing = false
         warnedPostFailed = false
+        chooseNudgeTarget()
 
         // Throws before any state changes, so a failed assertion leaves the
         // session cleanly stopped rather than half-started.
@@ -98,11 +111,12 @@ public final class YolkSession {
 
         emit(.started(config))
 
-        // Worst case yolk acts after threshold + interval + timer leeway of
-        // idle. If the display sleeps sooner, the screen locks first and yolk
-        // pauses forever — say so up front rather than fail silently.
+        // Checks are timed to the nudge, so the worst case is the top of the
+        // threshold range plus timer slack. If the display sleeps sooner, the
+        // screen locks first and yolk pauses forever — say so up front rather
+        // than fail silently.
         if let displaySleep = environment.displaySleepSeconds(),
-           config.threshold + config.interval + 5 >= displaySleep {
+           Self.displaySleepBeatsYolk(config, displaySleep: displaySleep) {
             emit(.displaySleepTooSoon(displaySleep))
         }
 
@@ -123,20 +137,43 @@ public final class YolkSession {
         emit(.stopped(reason))
     }
 
+    /// Whether the display would sleep before yolk got the chance to act.
+    /// Shared with the app, which shows the same warning in its settings.
+    public nonisolated static func displaySleepBeatsYolk(
+        _ config: YolkConfig, displaySleep: TimeInterval
+    ) -> Bool {
+        config.threshold.upperBound + 5 >= displaySleep
+    }
+
     private func emit(_ event: YolkEvent) {
         onEvent?(event)
+    }
+
+    private func chooseNudgeTarget() {
+        let range = config.threshold
+        nudgeTarget = range.lowerBound
+            + environment.randomUnit() * (range.upperBound - range.lowerBound)
     }
 
     private func scheduleTimers() {
         timers.cancelAll()
 
+        // One-shot, rescheduled after each check for whenever that check says
+        // the next one is due. The first check comes a second after starting.
         let ticker = DispatchSource.makeTimerSource(queue: .main)
-        ticker.schedule(deadline: .now() + 1, repeating: config.interval, leeway: .seconds(5))
+        ticker.schedule(deadline: .now() + 1, leeway: .milliseconds(500))
         ticker.setEventHandler { [weak self] in
-            MainActor.assumeIsolated { self?.tick() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.tick()
+                guard case .running = self.state else { return }
+                self.ticker?.schedule(
+                    deadline: .now() + self.nextCheckDelay, leeway: .milliseconds(500))
+            }
         }
         ticker.resume()
         timers.adopt(ticker)
+        self.ticker = ticker
 
         // One-shot so the timeout fires on time rather than up to an interval
         // late. DispatchTime pauses during system sleep, so the monotonic check
@@ -158,7 +195,11 @@ public final class YolkSession {
     public func reconfigure(_ newConfig: YolkConfig) {
         let timeoutChanged = newConfig.timeout != config.timeout
         let intervalChanged = newConfig.interval != config.interval
+        let thresholdChanged = newConfig.threshold != config.threshold
         config = newConfig
+        if thresholdChanged {
+            chooseNudgeTarget()
+        }
 
         guard case .running(let run) = state else { return }
 
@@ -173,7 +214,7 @@ public final class YolkSession {
                     activityCount: run.activityCount,
                     pausedBecause: run.pausedBecause))
         }
-        if timeoutChanged || intervalChanged {
+        if timeoutChanged || intervalChanged || thresholdChanged {
             scheduleTimers()
         }
     }
@@ -183,6 +224,8 @@ public final class YolkSession {
     /// on real timers, without it becoming part of YolkKit's API.
     package func tick() {
         guard case .running(var run) = state else { return }
+        // Unless something below says sooner, check again after the interval.
+        nextCheckDelay = config.interval
 
         if let monotonicDeadline, environment.monotonicNow() >= monotonicDeadline {
             stop(reason: .timeoutReached)
@@ -204,8 +247,13 @@ public final class YolkSession {
         }
 
         let idle = environment.idleSeconds()
-        emit(.checked(idle: idle))
-        guard idle >= config.threshold else { return }
+        emit(.checked(idle: idle, nudgeAt: nudgeTarget))
+        guard idle >= nudgeTarget else {
+            // Wake right when idle reaches the target, so the nudge lands at
+            // the random point rather than at the next fixed tick.
+            nextCheckDelay = min(config.interval, max(nudgeTarget - idle, 0.5))
+            return
+        }
 
         guard environment.postActivity() else {
             if !warnedPostFailed {
@@ -220,6 +268,10 @@ public final class YolkSession {
         // input can false-pass this, which is acceptable: real input means
         // presence, and a missing grant is caught on the next idle tick.
         environment.waitForEventDelivery()
+        // A new random point for the next nudge, timed from now: a landed
+        // nudge has just reset idle to zero.
+        chooseNudgeTarget()
+        nextCheckDelay = min(config.interval, max(nudgeTarget, 0.5))
         if environment.idleSeconds() < 1.0 {
             run.activityCount += 1
             state = .running(run)

@@ -5,9 +5,9 @@ using Yolk.Domain.Configuration;
 namespace Yolk.Application.Features.Settings;
 
 /// <summary>The tray app's settings, validated.</summary>
-public sealed record SettingsDto(double Interval, double Threshold, StopAfter StopAfter)
+public sealed record SettingsDto(double Interval, ThresholdRange Threshold, StopAfter StopAfter)
 {
-    /// <summary>Both values are validated on the way in, so this cannot throw.</summary>
+    /// <summary>Every value is validated on the way in, so this cannot throw.</summary>
     public YolkConfig ToConfig() => new(Interval, Threshold, StopAfter.Timeout());
 }
 
@@ -22,9 +22,15 @@ public sealed record ApplyStoredSettings;
 
 /// <summary>
 /// Change some settings: store them and apply them to the session, running or
-/// not. Null leaves a value unchanged; out-of-range values are clamped.
+/// not. Null leaves a value unchanged; out-of-range values are clamped. Moving
+/// one end of the threshold range past the other carries the other along, so
+/// the range never inverts.
 /// </summary>
-public sealed record UpdateSettings(double? Interval = null, double? Threshold = null, StopAfter? StopAfter = null);
+public sealed record UpdateSettings(
+    double? Interval = null,
+    double? ThresholdMin = null,
+    double? ThresholdMax = null,
+    StopAfter? StopAfter = null);
 
 /// <summary>
 /// Reads the store, falling back to the documented defaults for anything
@@ -37,13 +43,29 @@ internal sealed class SettingsReader(ISettingsRepository repository)
     {
         var stored = repository.Load();
         return new SettingsDto(
-            Valid(stored.Interval, YolkConfig.IsValidInterval, YolkConfig.DefaultInterval),
-            Valid(stored.Threshold, YolkConfig.IsValidThreshold, YolkConfig.DefaultThreshold),
+            stored.Interval is { } i && YolkConfig.IsValidInterval(i) ? i : YolkConfig.DefaultInterval,
+            Threshold(stored),
             stored.StopAfter ?? StopAfter.Never);
     }
 
-    private static double Valid(double? value, Func<double, bool> isValid, double fallback) =>
-        value is { } v && isValid(v) ? v : fallback;
+    /// <summary>
+    /// The stored range; or the pre-range single value, as a fixed point; or
+    /// the default. A range that is out of bounds or inverted is thrown away
+    /// whole rather than half-trusted.
+    /// </summary>
+    private static ThresholdRange Threshold(StoredSettings stored)
+    {
+        if (stored.ThresholdMin is { } low && stored.ThresholdMax is { } high
+            && YolkConfig.IsValidThreshold(low) && YolkConfig.IsValidThreshold(high) && low <= high)
+        {
+            return new ThresholdRange(low, high);
+        }
+        if (stored.LegacyThreshold is { } legacy && YolkConfig.IsValidThreshold(legacy))
+        {
+            return ThresholdRange.Fixed(legacy);
+        }
+        return ThresholdRange.Default;
+    }
 }
 
 internal sealed class GetSettingsHandler(SettingsReader reader) : IQueryHandler<GetSettings, SettingsDto>
@@ -66,10 +88,20 @@ internal sealed class UpdateSettingsHandler(
     public SettingsDto Handle(UpdateSettings command)
     {
         var current = reader.Read();
+        var (low, high) = (current.Threshold.Min, current.Threshold.Max);
+        if (Clamp(command.ThresholdMin, YolkConfig.MinThreshold, YolkConfig.MaxThreshold) is { } newLow)
+        {
+            (low, high) = (newLow, Math.Max(high, newLow));
+        }
+        if (Clamp(command.ThresholdMax, YolkConfig.MinThreshold, YolkConfig.MaxThreshold) is { } newHigh)
+        {
+            (low, high) = (Math.Min(low, newHigh), newHigh);
+        }
         var updated = new SettingsDto(
-            Clamp(command.Interval, current.Interval, YolkConfig.MinInterval, YolkConfig.MaxInterval),
-            Clamp(command.Threshold, current.Threshold, YolkConfig.MinThreshold, YolkConfig.MaxThreshold),
+            Clamp(command.Interval, YolkConfig.MinInterval, YolkConfig.MaxInterval) ?? current.Interval,
+            new ThresholdRange(low, high),
             command.StopAfter ?? current.StopAfter);
+
         if (updated == current)
         {
             return current;
@@ -81,6 +113,6 @@ internal sealed class UpdateSettingsHandler(
 
     // NaN is treated as "no change" rather than clamped, since it has no place
     // in the range at all.
-    private static double Clamp(double? requested, double current, double min, double max) =>
-        requested is { } value && !double.IsNaN(value) ? Math.Clamp(value, min, max) : current;
+    private static double? Clamp(double? requested, double min, double max) =>
+        requested is { } value && !double.IsNaN(value) ? Math.Clamp(value, min, max) : null;
 }

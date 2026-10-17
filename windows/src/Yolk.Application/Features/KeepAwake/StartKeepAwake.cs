@@ -28,7 +28,8 @@ internal sealed class StartKeepAwakeHandler(
     SessionTimers timers,
     IPowerRequestService power,
     IClock clock,
-    IDisplaySettingsProvider display)
+    IDisplaySettingsProvider display,
+    IRandomSource random)
     : ICommandHandler<StartKeepAwake, StartKeepAwakeResult>
 {
     public StartKeepAwakeResult Handle(StartKeepAwake command)
@@ -40,7 +41,7 @@ internal sealed class StartKeepAwakeHandler(
         }
         if (command.Config is { } config)
         {
-            session.Reconfigure(config, clock.Now(), clock.MonotonicSeconds());
+            session.Reconfigure(config, clock.Now(), clock.MonotonicSeconds(), random.NextUnit());
         }
 
         // Acquired before any state changes, so a refusal leaves the session
@@ -54,7 +55,7 @@ internal sealed class StartKeepAwakeHandler(
             return new StartKeepAwakeResult.PowerRequestRefused(refused.Code);
         }
 
-        runtime.Publish(session.Start(clock.Now(), clock.MonotonicSeconds()));
+        runtime.Publish(session.Start(clock.Now(), clock.MonotonicSeconds(), random.NextUnit()));
         runtime.Publish(session.CheckDisplaySleep(display.DisplaySleepSeconds()));
         timers.Schedule();
         return new StartKeepAwakeResult.Started();

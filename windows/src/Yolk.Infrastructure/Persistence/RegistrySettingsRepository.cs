@@ -21,17 +21,23 @@ internal sealed class RegistrySettingsRepository : ISettingsRepository
         using var settings = Registry.CurrentUser.OpenSubKey(KeyPath);
         return new StoredSettings(
             ReadDouble(settings, SettingNames.Interval),
-            ReadDouble(settings, SettingNames.Threshold),
+            ReadDouble(settings, SettingNames.ThresholdMin),
+            ReadDouble(settings, SettingNames.ThresholdMax),
+            ReadDouble(settings, SettingNames.LegacyThreshold),
             SettingNames.ParseStopAfter(settings?.GetValue(SettingNames.StopAfter) as string));
     }
 
-    public void Save(double interval, double threshold, StopAfter stopAfter)
+    public void Save(double interval, ThresholdRange threshold, StopAfter stopAfter)
     {
         using var settings = Registry.CurrentUser.CreateSubKey(KeyPath);
-        settings.SetValue(SettingNames.Interval, interval.ToString(CultureInfo.InvariantCulture), RegistryValueKind.String);
-        settings.SetValue(SettingNames.Threshold, threshold.ToString(CultureInfo.InvariantCulture), RegistryValueKind.String);
+        WriteDouble(settings, SettingNames.Interval, interval);
+        WriteDouble(settings, SettingNames.ThresholdMin, threshold.Min);
+        WriteDouble(settings, SettingNames.ThresholdMax, threshold.Max);
         settings.SetValue(SettingNames.StopAfter, SettingNames.Name(stopAfter), RegistryValueKind.String);
     }
+
+    private static void WriteDouble(RegistryKey key, string name, double value) =>
+        key.SetValue(name, value.ToString(CultureInfo.InvariantCulture), RegistryValueKind.String);
 
     private static double? ReadDouble(RegistryKey? key, string name) =>
         key?.GetValue(name) is string text
@@ -48,7 +54,10 @@ internal sealed class RegistrySettingsRepository : ISettingsRepository
 internal static class SettingNames
 {
     public const string Interval = "interval";
-    public const string Threshold = "threshold";
+    public const string ThresholdMin = "thresholdMin";
+    public const string ThresholdMax = "thresholdMax";
+    /// <summary>Before thresholds became ranges. Read, never written.</summary>
+    public const string LegacyThreshold = "threshold";
     public const string StopAfter = "stopAfter";
 
     public static string Name(Domain.Configuration.StopAfter option) => option switch

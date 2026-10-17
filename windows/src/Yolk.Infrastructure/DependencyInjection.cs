@@ -5,6 +5,7 @@ using Yolk.Infrastructure.Display;
 using Yolk.Infrastructure.Input;
 using Yolk.Infrastructure.Persistence;
 using Yolk.Infrastructure.Power;
+using Yolk.Infrastructure.Randomness;
 using Yolk.Infrastructure.Sessions;
 using Yolk.Infrastructure.Startup;
 using Yolk.Infrastructure.Time;
@@ -18,6 +19,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IRandomSource, SystemRandomSource>();
         services.AddSingleton<IPowerRequestService, Win32PowerRequestService>();
         services.AddSingleton<IIdleTimeProvider, LastInputIdleTimeProvider>();
         services.AddSingleton<IInputSimulator, SendInputSimulator>();

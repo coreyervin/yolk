@@ -32,7 +32,7 @@ internal static class ArgumentParser
     public static ParseOutcome Parse(IReadOnlyList<string> args)
     {
         var interval = YolkConfig.DefaultInterval;
-        var threshold = YolkConfig.DefaultThreshold;
+        var threshold = ThresholdRange.Default;
         double? timeout = null;
         var verbose = false;
 
@@ -63,12 +63,7 @@ internal static class ArgumentParser
                     interval = i;
                     break;
                 case "--threshold":
-                    if (NumberParser.Parse(ValueFor(arg)) is not { } t || !YolkConfig.IsValidThreshold(t))
-                    {
-                        throw new ArgumentError(
-                            "--threshold must be 5–300 seconds (above 300 Slack could mark you away)");
-                    }
-                    threshold = t;
+                    threshold = ParseThreshold(ValueFor(arg));
                     break;
                 case "-t" or "--timeout":
                     var raw = ValueFor(arg);
@@ -93,5 +88,23 @@ internal static class ArgumentParser
         // YolkConfig stays the only thing entitled to say so.
         var config = new YolkConfig(interval, threshold, timeout);
         return new ParseOutcome.Run(new Invocation(config, verbose, InvokedBare: args.Count == 0));
+    }
+
+    /// <summary><c>45</c> for a fixed point, or <c>30-60</c> for a random point in that range.</summary>
+    internal static ThresholdRange ParseThreshold(string raw)
+    {
+        var parts = raw.Split('-');
+        var values = parts.Select(NumberParser.Parse).ToList();
+        if (parts.Length is not (1 or 2)
+            || values.Any(v => v is not { } n || !YolkConfig.IsValidThreshold(n)))
+        {
+            throw new ArgumentError("--threshold must be 5–300 seconds (above 300 Slack could mark you away)");
+        }
+        var (low, high) = (values[0]!.Value, values[^1]!.Value);
+        if (low > high)
+        {
+            throw new ArgumentError("--threshold range must run from low to high, e.g. 30-60");
+        }
+        return new ThresholdRange(low, high);
     }
 }

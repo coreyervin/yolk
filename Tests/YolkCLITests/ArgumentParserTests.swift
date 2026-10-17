@@ -14,23 +14,31 @@ struct ArgumentParserTests {
             return
         }
         #expect(invocation.config.interval == 30)
-        #expect(invocation.config.threshold == 60)
+        #expect(invocation.config.threshold == 30...60)
         #expect(invocation.config.timeout == nil)
         #expect(invocation.verbose == false)
         #expect(invocation.invokedBare == true)
     }
 
-    @Test("both spellings of every flag are accepted", arguments: [
-        (["-i", "45"], 45.0, 60.0, TimeInterval?.none, false),
-        (["--interval", "45"], 45.0, 60.0, TimeInterval?.none, false),
-        (["--threshold", "90"], 30.0, 90.0, TimeInterval?.none, false),
-        (["-t", "8h"], 30.0, 60.0, TimeInterval?.some(28800), false),
-        (["--timeout", "90m"], 30.0, 60.0, TimeInterval?.some(5400), false),
-        (["-v"], 30.0, 60.0, TimeInterval?.none, true),
-        (["--verbose"], 30.0, 60.0, TimeInterval?.none, true),
-    ])
+    /// Explicitly typed: inferring ranges inside this many tuple literals is
+    /// too much for the type checker.
+    static let spellingCases: [(
+        args: [String], interval: TimeInterval, threshold: ClosedRange<TimeInterval>,
+        timeout: TimeInterval?, verbose: Bool
+    )] = [
+        (["-i", "45"], 45, 30...60, nil, false),
+        (["--interval", "45"], 45, 30...60, nil, false),
+        (["--threshold", "90"], 30, 90...90, nil, false),
+        (["--threshold", "20-40"], 30, 20...40, nil, false),
+        (["-t", "8h"], 30, 30...60, 28800, false),
+        (["--timeout", "90m"], 30, 30...60, 5400, false),
+        (["-v"], 30, 30...60, nil, true),
+        (["--verbose"], 30, 30...60, nil, true),
+    ]
+
+    @Test("both spellings of every flag are accepted", arguments: spellingCases)
     func flagSpellings(
-        args: [String], interval: TimeInterval, threshold: TimeInterval,
+        args: [String], interval: TimeInterval, threshold: ClosedRange<TimeInterval>,
         timeout: TimeInterval?, verbose: Bool
     ) throws {
         guard case .run(let invocation) = try ArgumentParser.parse(args) else {
@@ -70,7 +78,7 @@ struct ArgumentParserTests {
             return
         }
         #expect(invocation.config.interval == 15)
-        #expect(invocation.config.threshold == 30)
+        #expect(invocation.config.threshold == 30...30)
         #expect(invocation.config.timeout == 45)
         #expect(invocation.verbose == true)
     }
@@ -93,6 +101,17 @@ struct ArgumentParserTests {
          "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
         (["--threshold", "nope"],
          "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "4-60"],
+         "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "30-301"],
+         "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "30-"],
+         "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "-30"],
+         "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "10-20-30"],
+         "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"),
+        (["--threshold", "60-30"], "--threshold range must run from low to high, e.g. 30-60"),
         (["-t", "abc"], "invalid duration 'abc' — use e.g. 8h, 90m, 45s, or seconds"),
         (["-t", "0"], "invalid duration '0' — use e.g. 8h, 90m, 45s, or seconds"),
         (["-t", "-5m"], "invalid duration '-5m' — use e.g. 8h, 90m, 45s, or seconds"),
@@ -130,7 +149,7 @@ struct ArgumentParserTests {
             Issue.record("expected .run")
             return
         }
-        #expect(invocation.config.threshold == expected)
+        #expect(invocation.config.threshold == expected...expected)
     }
 
     /// The original validated each flag as it parsed it, so the leftmost bad

@@ -6,9 +6,15 @@ using Yolk.Domain.Sessions;
 namespace Yolk.Application.Features.KeepAwake;
 
 /// <summary>
-/// The running session's two timers: the periodic activity check, and a
-/// one-shot for the timeout. Shared by Start and Reconfigure.
+/// The running session's two timers: the activity check, and a one-shot for
+/// the timeout. Shared by Start and Reconfigure.
 /// </summary>
+/// <remarks>
+/// The check is one-shot too, rescheduled after each run for whenever that
+/// check says the next is due — timed to land as idle reaches the random
+/// nudge point, so the nudges fall anywhere in the range rather than on a
+/// fixed tick.
+/// </remarks>
 internal sealed class SessionTimers(
     SessionRuntime runtime,
     IScheduler scheduler,
@@ -16,24 +22,23 @@ internal sealed class SessionTimers(
 {
     public void Schedule()
     {
-        var config = runtime.Session.Config;
-        var ticker = scheduler.Schedule(
-            TimeSpan.FromSeconds(1),
-            TimeSpan.FromSeconds(config.Interval),
-            () => checkActivity.Handle(new CheckActivity()));
+        // The first check comes a second after starting.
+        ScheduleCheck(TimeSpan.FromSeconds(1));
 
-        // One-shot so the timeout fires on time rather than up to an interval
-        // late. Timers may not count through system sleep, so CheckActivity's
+        // Timers may not count through system sleep, so CheckActivity's
         // deadline test remains the sleep-safe backstop.
-        if (config.Timeout is { } timeout)
-        {
-            var deadline = scheduler.Schedule(
-                TimeSpan.FromSeconds(timeout), null, () => runtime.End(StopReason.TimeoutReached));
-            runtime.ReplaceTimers(ticker, deadline);
-        }
-        else
-        {
-            runtime.ReplaceTimers(ticker);
-        }
+        runtime.ReplaceDeadline(runtime.Session.Config.Timeout is { } timeout
+            ? scheduler.Schedule(TimeSpan.FromSeconds(timeout), null, () => runtime.End(StopReason.TimeoutReached))
+            : null);
     }
+
+    private void ScheduleCheck(TimeSpan delay) =>
+        runtime.ReplaceTicker(scheduler.Schedule(delay, null, () =>
+        {
+            checkActivity.Handle(new CheckActivity());
+            if (runtime.Session.IsRunning)
+            {
+                ScheduleCheck(TimeSpan.FromSeconds(runtime.NextCheckDelay));
+            }
+        }));
 }
