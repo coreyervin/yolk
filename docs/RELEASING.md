@@ -166,33 +166,26 @@ Or attach it by hand at github.com/coreyervin/yolk/releases.
 make cask          # prints Casks/yolk.rb with the DMG's real checksum
 ```
 
-Paste that into the tap at `~/Code/homebrew-tap/Casks/yolk.rb`, then:
+Write it into the tap, then commit, push, and install it for real:
 
 ```sh
+make cask > ~/Code/homebrew-tap/Casks/yolk.rb
 cd ~/Code/homebrew-tap
-git add Casks/yolk.rb && git commit -m "Add yolk cask X.Y.Z" && git push
-brew update && brew install --cask coreyervin/tap/yolk     # verify for real
+brew style Casks/yolk.rb                                   # should be clean
+git add Casks/yolk.rb && git commit -m "Update yolk to X.Y.Z" && git push
+brew update && brew upgrade --cask coreyervin/tap/yolk
+yolk --version                                             # should print X.Y.Z
 ```
 
-**Decide what happens to the formula.** The tap currently ships
-`Formula/yolk.rb`, which builds the CLI from source. Once the cask exists, a
-formula and a cask of the same name in one tap compete:
-`brew install coreyervin/tap/yolk` resolves to the formula, and the cask needs
-`--cask` to disambiguate.
+The tap ships only the cask. The source-built formula was removed at 1.0.1 so
+`brew install coreyervin/tap/yolk` has one meaning; anyone who wants only the
+CLI builds it from a clone with `make install`.
 
-The case for the cask winning is that it installs the app *and*
-symlinks the embedded CLI onto `PATH` in one step, already notarized. Removing
-`Formula/yolk.rb` makes `brew install --cask coreyervin/tap/yolk` the single
-documented path, with `make install` still there for anyone who wants only the
-CLI from source.
+### 5. Update the release notes
 
-The alternative is keeping both and living with the `--cask` flag. Worth a
-moment's thought rather than a default.
-
-### 5. Point the README at it
-
-Replace the "CLI, via Homebrew" and "The app" sections in `README.md` with the
-cask, and delete the "Not yet notarized" warning — it stops being true.
+If the release's notes or the README mention a version-specific download, make
+sure they still point at the new DMG. `releases/latest` links keep working on
+their own.
 
 ---
 

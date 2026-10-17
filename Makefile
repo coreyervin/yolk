@@ -183,18 +183,16 @@ cask:
 		'' \
 		'  url "https://github.com/coreyervin/yolk/releases/download/v#{version}/Yolk-#{version}.dmg"' \
 		'  name "Yolk"' \
-		'  desc "Keep your Mac awake and Slack active while AI agents run"' \
+		'  desc "Keep the machine awake and Slack active while AI agents run"' \
 		'  homepage "https://github.com/coreyervin/yolk"' \
 		'' \
-		'  depends_on macos: ">= :sonoma"' \
+		'  depends_on macos: :sonoma' \
 		'' \
 		'  app "Yolk.app"' \
 		'  # The app embeds the CLI; link it onto PATH rather than shipping it twice.' \
 		'  binary "#{appdir}/Yolk.app/Contents/Resources/yolk"' \
 		'' \
-		'  zap trash: [' \
-		'    "~/Library/Preferences/io.github.coreyervin.yolk.plist",' \
-		'  ]' \
+		'  zap trash: "~/Library/Preferences/io.github.coreyervin.yolk.plist"' \
 		'end'
 
 clean:

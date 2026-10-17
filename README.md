@@ -41,39 +41,34 @@ harmless — two power assertions, same result.
 
 ## Install
 
-### CLI, via Homebrew
+### Homebrew
 
 ```sh
-brew install coreyervin/tap/yolk
+brew install --cask coreyervin/tap/yolk
 ```
 
-### CLI, from source
+Installs the signed, notarized app to `/Applications` and links the `yolk` CLI
+it embeds onto your `PATH`, so this one command gets you both.
+
+### Download
+
+Grab `Yolk-X.Y.Z.dmg` from the
+[latest release](https://github.com/coreyervin/yolk/releases/latest) and drag
+Yolk into Applications. The CLI is inside the app at
+`Yolk.app/Contents/Resources/yolk`.
+
+### From source
 
 ```sh
 git clone https://github.com/coreyervin/yolk.git
 cd yolk
-make install          # builds and installs to ~/.local/bin/yolk
+make install          # CLI only, to ~/.local/bin/yolk
+make install-app      # the app, to /Applications
 ```
 
-Override the location with `make install PREFIX=/usr/local`.
+Override the CLI's location with `make install PREFIX=/usr/local`.
 
-### The app
-
-Build it yourself for now:
-
-```sh
-make app
-open .build/xcode/Build/Products/Release/Yolk.app
-```
-
-> **Not yet notarized.** Yolk is signed with a local development certificate,
-> so a downloaded build would be blocked by Gatekeeper on any other Mac.
-> Building from source is the supported path until a Developer ID signing
-> identity is in place. That also means macOS will ask you to grant
-> Accessibility permission again after a rebuild on a machine other than the
-> one that created the certificate.
-
-Drag `Yolk.app` to `/Applications` if you want **Launch at Login** — macOS only
+Install the app in `/Applications` if you want **Launch at Login** — macOS only
 registers login items reliably from there, and Yolk's settings pane will tell
 you so rather than silently failing.
 
@@ -197,7 +192,6 @@ pre-refactor binary. `docs/RELEASING.md` is the release runbook.
 ## Also on the list
 
 - `yolk -- <cmd>`: stay awake only while a wrapped command runs.
-- Developer ID signing and notarization, so the app can ship as a download.
 
 ## License
 
