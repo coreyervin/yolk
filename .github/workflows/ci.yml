@@ -14,7 +14,7 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Toolchain
         run: xcodebuild -version && swift --version
@@ -36,7 +36,7 @@ jobs:
   cask:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # `make cask` only checksums the DMG, so an empty placeholder is enough to
       # render the template and hold it to `brew style`.
