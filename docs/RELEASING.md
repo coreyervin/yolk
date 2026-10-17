@@ -113,13 +113,32 @@ That runs, failing early rather than late:
 3. `make test`
 4. `xcodebuild archive`, then export with Developer ID signing
 5. notarize the **app**, staple it
-6. assemble `dist/Yolk-X.Y.Z.dmg`
+6. assemble `dist/Yolk-X.Y.Z.dmg` and sign it with the Developer ID
 7. notarize the **DMG**, staple it
 8. `spctl` assessment, as Gatekeeper would do it
 
 Both the app and the DMG are notarized on purpose. Stapling only the DMG leaves
 the app itself without a ticket, so its first launch after being dragged out
 needs a network round trip. Expect two Apple round trips, a few minutes each.
+
+The DMG is signed too, not just the app inside it. The `spctl` check in step 8
+assesses the disk image's own signature, and an unsigned DMG fails it with
+`source=no usable signature` even when it is notarized and stapled.
+
+**A team's first notarization can take hours**, not minutes — 1.0.1's app
+submission sat at `In Progress` overnight. The DMG submissions after it came
+back in minutes. If `make release` gets interrupted while waiting, don't rerun it:
+that wipes `dist/` and joins the back of the queue. The submission keeps going
+on Apple's side, so wait on it and finish by hand:
+
+```sh
+xcrun notarytool wait <submission-id> --keychain-profile "yolk-notary"
+```
+
+then carry on from the `stapler staple` line in the `release` target. The 1.0.1
+wait failed overnight with a network timeout and then "No Keychain password
+item found", most likely the Mac sleeping or locking; the credentials worked
+again the next morning. Keep the Mac awake and unlocked while it waits.
 
 **If notarization is rejected**, get the reason — the log is specific and
 usually names the offending binary:
