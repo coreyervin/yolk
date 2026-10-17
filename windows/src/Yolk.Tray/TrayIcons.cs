@@ -1,5 +1,4 @@
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 
 namespace Yolk.Tray;
 
@@ -11,7 +10,7 @@ namespace Yolk.Tray;
 /// The Mac's menu bar glyphs are black template images, which would vanish on
 /// a dark taskbar; the coloured egg reads on both.
 /// </remarks>
-internal sealed partial class TrayIcons : IDisposable
+internal sealed class TrayIcons : IDisposable
 {
     public Icon Active { get; }
     public Icon Idle { get; }
@@ -40,18 +39,39 @@ internal sealed partial class TrayIcons : IDisposable
             graphics.DrawImage(source, new Rectangle(Point.Empty, size),
                 0, 0, source.Width, source.Height, GraphicsUnit.Pixel, attributes);
         }
-        // Icon.FromHandle doesn't own the HICON, so clone it into an Icon that
-        // does and destroy the original.
-        var handle = bitmap.GetHicon();
-        try
+        return ToIcon(bitmap);
+    }
+
+    /// <summary>
+    /// Wraps the bitmap's PNG encoding in a one-image .ico, which Icon loads
+    /// directly. Unlike Bitmap.GetHicon, this leaves no native icon handle to
+    /// destroy by hand, so the tray app needs no P/Invoke of its own.
+    /// </summary>
+    private static Icon ToIcon(Bitmap bitmap)
+    {
+        using var png = new MemoryStream();
+        bitmap.Save(png, ImageFormat.Png);
+
+        using var ico = new MemoryStream();
+        using (var writer = new BinaryWriter(ico, System.Text.Encoding.UTF8, leaveOpen: true))
         {
-            using var borrowed = Icon.FromHandle(handle);
-            return (Icon)borrowed.Clone();
+            // ICONDIR: reserved, type 1 (icon), one image.
+            writer.Write((short)0);
+            writer.Write((short)1);
+            writer.Write((short)1);
+            // ICONDIRENTRY: a dimension of 0 means 256.
+            writer.Write((byte)(bitmap.Width >= 256 ? 0 : bitmap.Width));
+            writer.Write((byte)(bitmap.Height >= 256 ? 0 : bitmap.Height));
+            writer.Write((byte)0);  // no palette
+            writer.Write((byte)0);  // reserved
+            writer.Write((short)1); // colour planes
+            writer.Write((short)32); // bits per pixel
+            writer.Write((int)png.Length);
+            writer.Write(6 + 16);   // the image follows the one-entry directory
+            png.WriteTo(ico);
         }
-        finally
-        {
-            DestroyIcon(handle);
-        }
+        ico.Position = 0;
+        return new Icon(ico);
     }
 
     private static ColorMatrix Greyscale() => new(
@@ -62,10 +82,6 @@ internal sealed partial class TrayIcons : IDisposable
         [0, 0, 0, 1, 0],
         [0, 0, 0, 0, 1],
     ]);
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool DestroyIcon(nint handle);
 
     public void Dispose()
     {

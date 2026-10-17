@@ -10,14 +10,20 @@
 // While the screen is locked, activity simulation pauses: locking is the
 // "I actually walked away" gesture.
 //
-// All of that lives in Yolk.Core, which the tray app shares. This file is only
-// the process: flags in, events out, signals, and the exit code.
+// This file is the composition root and nothing more: flags in, slices wired
+// up, events out, signals, and the exit code. The work happens in
+// Yolk.Application's KeepAwake and ActivityCheck slices.
 
 using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Yolk.Application;
+using Yolk.Application.Abstractions;
+using Yolk.Application.Features.KeepAwake;
+using Yolk.Application.Sessions;
 using Yolk.Cli;
-using Yolk.Core;
-using Yolk.Platform.Windows;
+using Yolk.Domain.Sessions;
+using Yolk.Infrastructure;
 
 // The banner and warnings use ✓, •, ⚠, and 💡.
 Console.OutputEncoding = Encoding.UTF8;
@@ -64,40 +70,43 @@ if (!OperatingSystem.IsWindows())
     return Die("this build of yolk only runs on Windows");
 }
 
-// ── Wiring ─────────────────────────────────────────────────────────────────
+// ── Composition ────────────────────────────────────────────────────────────
 
-var environment = new Win32Environment();
 using var loop = new EventLoop();
+using var services = new ServiceCollection()
+    .AddApplication()
+    .AddInfrastructure()
+    .AddSingleton<IScheduler>(loop)
+    .BuildServiceProvider();
 
+var clock = services.GetRequiredService<IClock>();
 var renderer = new ConsoleRenderer(
     invocation.Verbose,
     invocation.InvokedBare,
     Environment.ProcessId,
-    environment.Now,
+    clock.Now,
     WriteOut,
     WriteErr);
 
-using var session = new YolkSession(invocation.Config, environment, loop);
-session.Emitted += e =>
+services.GetRequiredService<ISessionEvents>().Emitted += e =>
 {
     renderer.Handle(e);
-    // The engine never exits; the CLI does, once the session has said why.
+    // The session never exits the process; the CLI does, once it has said why.
     if (e is YolkEvent.Stopped)
     {
         loop.Quit();
     }
 };
 
-try
+var start = services.GetRequiredService<ICommandHandler<StartKeepAwake, StartKeepAwakeResult>>();
+var stop = services.GetRequiredService<ICommandHandler<StopKeepAwake>>();
+
+if (start.Handle(new StartKeepAwake(invocation.Config)) is StartKeepAwakeResult.PowerRequestRefused refused)
 {
-    session.Start();
-}
-catch (AssertionCreationException error)
-{
-    return Die($"failed to create power request (Win32 error {error.Code})");
+    return Die($"failed to create power request (Win32 error {refused.Code})");
 }
 
-// The tip and the Ctrl-C hint come last, after any warning Start() emitted.
+// The tip and the Ctrl-C hint come last, after any warning the start emitted.
 renderer.RenderStartupTail();
 
 // ── Signals ────────────────────────────────────────────────────────────────
@@ -113,7 +122,7 @@ PosixSignalRegistration Trap(PosixSignal signal, string reason) =>
         loop.Post(() =>
         {
             renderer.UserStopReason = reason;
-            session.Stop();
+            stop.Handle(new StopKeepAwake());
         });
     });
 

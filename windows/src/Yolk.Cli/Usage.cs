@@ -1,4 +1,4 @@
-using Yolk.Core;
+using Yolk.Domain;
 
 namespace Yolk.Cli;
 

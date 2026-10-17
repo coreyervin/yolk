@@ -1,5 +1,6 @@
 using Yolk.Cli;
-using Yolk.Core;
+using Yolk.Domain.Configuration;
+using Yolk.Domain.Sessions;
 
 namespace Yolk.Cli.Tests;
 

@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Yolk.Cli\Yolk.Cli.csproj" />
-    <ProjectReference Include="..\..\src\Yolk.Core\Yolk.Core.csproj" />
     <ProjectReference Include="..\..\tests\Yolk.TestSupport\Yolk.TestSupport.csproj" />
   </ItemGroup>
 

@@ -1,12 +1,15 @@
-using Yolk.Core;
+using Yolk.Application.Abstractions;
+using Yolk.Domain.Sessions;
 
 namespace Yolk.TestSupport;
 
 /// <summary>
-/// A mutable stand-in for the whole machine. Tests set properties directly
-/// and then drive the session's Tick() by hand — no real timers, no waiting.
+/// A mutable stand-in for the machine, implementing every OS-facing port.
+/// Tests set properties directly and then drive CheckActivity by hand — no
+/// real timers, no waiting.
 /// </summary>
-public sealed class FakeSystem : ISystemEnvironment
+public sealed class FakeSystem :
+    IClock, IIdleTimeProvider, IInputSimulator, ISessionStateProvider, IDisplaySettingsProvider, IPowerRequestService
 {
     private bool _pendingVerification;
     private long _nextHandle = 1;
@@ -25,14 +28,14 @@ public sealed class FakeSystem : ISystemEnvironment
     public double? DisplaySleep { get; set; }
     public DateTime WallClock { get; set; } = new(2001, 9, 9, 1, 46, 40, DateTimeKind.Local);
 
-    /// <summary>When set, CreateAssertion throws this instead of vending a handle.</summary>
-    public AssertionCreationException? AssertionFailure { get; set; }
+    /// <summary>When set, Acquire throws this instead of granting a request.</summary>
+    public PowerRequestRefusedException? PowerRefusal { get; set; }
 
     public int PostCount { get; private set; }
-    public List<string> Created { get; } = [];
-    public List<AssertionHandle> Released { get; } = [];
+    public List<string> Acquired { get; } = [];
+    public List<PowerRequestHandle> Released { get; } = [];
 
-    // The session reads idle once to decide, then again after posting to
+    // CheckActivity reads idle once to decide, then again after posting to
     // confirm the timer actually reset.
     public double IdleSeconds()
     {
@@ -43,8 +46,6 @@ public sealed class FakeSystem : ISystemEnvironment
         }
         return Idle;
     }
-
-    public ConsoleState GetConsoleState() => Console;
 
     public bool PostActivity()
     {
@@ -57,23 +58,25 @@ public sealed class FakeSystem : ISystemEnvironment
         return true;
     }
 
-    public double? DisplaySleepSeconds() => DisplaySleep;
+    public void WaitForDelivery() { }
 
-    public double MonotonicNow() => Monotonic;
+    public ConsoleState Current() => Console;
+
+    public double? DisplaySleepSeconds() => DisplaySleep;
 
     public DateTime Now() => WallClock;
 
-    public AssertionHandle CreateAssertion(string reason)
+    public double MonotonicSeconds() => Monotonic;
+
+    public PowerRequestHandle Acquire(string reason)
     {
-        if (AssertionFailure is { } failure)
+        if (PowerRefusal is { } refusal)
         {
-            throw failure;
+            throw refusal;
         }
-        Created.Add(reason);
-        return new AssertionHandle(_nextHandle++);
+        Acquired.Add(reason);
+        return new PowerRequestHandle(_nextHandle++);
     }
 
-    public void ReleaseAssertion(AssertionHandle handle) => Released.Add(handle);
-
-    public void WaitForEventDelivery() { }
+    public void Release(PowerRequestHandle handle) => Released.Add(handle);
 }

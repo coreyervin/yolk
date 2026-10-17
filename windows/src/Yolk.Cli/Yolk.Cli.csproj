@@ -13,8 +13,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Yolk.Core\Yolk.Core.csproj" />
-    <ProjectReference Include="..\Yolk.Platform.Windows\Yolk.Platform.Windows.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yolk.Application\Yolk.Application.csproj" />
+    <ProjectReference Include="..\Yolk.Infrastructure\Yolk.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,8 +9,6 @@
     <RootNamespace>Yolk.Tray</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\Yolk.ico</ApplicationIcon>
-    <!-- LibraryImport (DestroyIcon in TrayIcons) generates unsafe code. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,9 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Yolk.Core\Yolk.Core.csproj" />
-    <ProjectReference Include="..\Yolk.AppCore\Yolk.AppCore.csproj" />
-    <ProjectReference Include="..\Yolk.Platform.Windows\Yolk.Platform.Windows.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yolk.Application\Yolk.Application.csproj" />
+    <ProjectReference Include="..\Yolk.Infrastructure\Yolk.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
