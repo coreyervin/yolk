@@ -1,0 +1,25 @@
+<Project>
+  <!-- Shared by every project under windows/. -->
+  <PropertyGroup>
+    <!-- Must match Sources/YolkKit/Version.swift; `make check-version` and
+         VersionTests both enforce it. -->
+    <Version>1.0.1</Version>
+    <!-- Keeps the git hash out of the informational version, so YolkVersion
+         reads "1.0.1" rather than "1.0.1+3f2a…". -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Lets the WinForms tray app build on macOS and Linux too, so a Mac
+         checkout can compile the whole solution. It still only runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <Company>Corey Ervin</Company>
+    <Product>Yolk</Product>
+    <Copyright>© 2026 Corey Ervin</Copyright>
+  </PropertyGroup>
+</Project>

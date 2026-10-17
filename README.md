@@ -188,8 +188,11 @@ that the work should stop.
 make test            # 129 tests
 make cli             # build the CLI
 make app             # build Yolk.app with the CLI embedded
-make check-version   # MARKETING_VERSION vs YolkKit.version
+make check-version   # YolkKit.version vs the Xcode project and the Windows port
 ```
+
+`windows/` holds a C# port for Windows — engine, CLI, and tray app — that has
+not yet been tried on a real PC. See [`windows/README.md`](windows/README.md).
 
 The engine lives in `YolkKit`, behind a `SystemEnvironment` struct of closures
 that is the single boundary to the OS — so the whole state machine is tested

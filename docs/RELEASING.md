@@ -80,12 +80,13 @@ sign builds.
 
 ### 1. Bump the version
 
-Nine places carry it. `make check-version` catches the two that matter most and
+Ten places carry it. `make check-version` catches the three that matter most and
 the test suite catches the goldens, so a miss fails loudly rather than shipping.
 
 - `Sources/YolkKit/Version.swift`
 - `Tests/YolkKitTests/VersionTests.swift`
 - `MARKETING_VERSION`, twice, in `App/Yolk.xcodeproj/project.pbxproj`
+- `<Version>` in `windows/Directory.Build.props`, for the Windows port
 - The first line of `Goldens/cli-help.txt`, `cli-version.txt`,
   `cli-banner-bare.txt`, `cli-banner-notip.txt`, `cli-banner-flagged.txt`
 

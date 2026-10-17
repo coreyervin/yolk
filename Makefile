@@ -99,10 +99,13 @@ check-version:
 		echo "check-version: build configurations disagree:" >&2; \
 		printf '  MARKETING_VERSION = %s\n' $$proj >&2; exit 1; \
 	fi; \
-	if [ "$$kit" != "$$proj" ]; then \
+	win=`sed -n 's/^[[:space:]]*<Version>\(.*\)<\/Version>/\1/p' \
+		windows/Directory.Build.props`; \
+	if [ "$$kit" != "$$proj" ] || [ "$$kit" != "$$win" ]; then \
 		echo "check-version: version mismatch" >&2; \
 		echo "  YolkKit.version   = $$kit" >&2; \
-		echo "  MARKETING_VERSION = $$proj" >&2; exit 1; \
+		echo "  MARKETING_VERSION = $$proj" >&2; \
+		echo "  windows <Version> = $$win" >&2; exit 1; \
 	fi; \
 	echo "check-version: $$kit"
 

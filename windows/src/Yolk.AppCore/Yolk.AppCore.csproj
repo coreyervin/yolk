@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The tray app's logic, kept out of WinForms so it can be unit-tested
+       anywhere. The counterpart of YolkAppKit on the Mac. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yolk.Core\Yolk.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yolk.AppCore.Tests" />
+  </ItemGroup>
+
+</Project>

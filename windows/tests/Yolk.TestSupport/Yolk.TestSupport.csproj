@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Fakes shared by the test projects — the counterpart of YolkTestSupport.
+       Only test projects reference it, so it never ships. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Yolk.Core\Yolk.Core.csproj" />
+  </ItemGroup>
+
+</Project>
