@@ -180,7 +180,7 @@ formula and a cask of the same name in one tap compete:
 `brew install coreyervin/tap/yolk` resolves to the formula, and the cask needs
 `--cask` to disambiguate.
 
-The design spec calls for the cask to win, because it installs the app *and*
+The case for the cask winning is that it installs the app *and*
 symlinks the embedded CLI onto `PATH` in one step, already notarized. Removing
 `Formula/yolk.rb` makes `brew install --cask coreyervin/tap/yolk` the single
 documented path, with `make install` still there for anyone who wants only the
@@ -210,5 +210,26 @@ locally built apps match released ones.
 
 **The self-signed certificate stays useful** on any machine that lacks the
 Developer ID — it is what keeps Accessibility from resetting on every rebuild
-during ordinary development. See decision 22 in `HANDOFF.md` for how to
-recreate it.
+during ordinary development. Ad-hoc signing ties the grant to the binary's
+cdhash, which changes on every build; a self-signed certificate makes the
+designated requirement `identifier + certificate root`, which doesn't.
+
+To recreate it if the keychain item is ever lost:
+
+```sh
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+  -keyout k.key -out c.crt -subj "/CN=Yolk Local Development/O=Yolk" \
+  -addext "basicConstraints=critical,CA:false" \
+  -addext "keyUsage=critical,digitalSignature" \
+  -addext "extendedKeyUsage=critical,codeSigning"
+# -certpbe/-keypbe/-macalg are required: OpenSSL 3's defaults produce a
+# PKCS12 that macOS refuses with "MAC verification failed".
+openssl pkcs12 -export -inkey k.key -in c.crt -out c.p12 -passout pass:yolk \
+  -name "Yolk Local Development" \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+security import c.p12 -k ~/Library/Keychains/login.keychain-db -P yolk \
+  -T /usr/bin/codesign
+# User-level trust is enough; no admin password needed.
+security add-trusted-cert -r trustRoot -p codeSign \
+  -k ~/Library/Keychains/login.keychain-db c.crt
+```
