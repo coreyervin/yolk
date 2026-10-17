@@ -19,10 +19,16 @@ Two mechanisms, both running the whole time Yolk is on:
 
 1. **Stays awake** — holds a `PreventUserIdleSystemSleep` power assertion, the
    same one `caffeinate -i` uses. Your loop keeps running.
-2. **Stays active** — when system idle time crosses a threshold (default 60s),
-   Yolk posts a synthetic mouse-moved event *at the cursor's current position*.
-   The cursor never visibly moves, but the system idle timer resets — and that
-   timer is what Slack and Teams read to decide "away".
+2. **Stays active** — when system idle time reaches a threshold, Yolk posts a
+   synthetic mouse-moved event *at the cursor's current position*. The cursor
+   never visibly moves, but the system idle timer resets — and that timer is
+   what Slack and Teams read to decide "away".
+
+The threshold isn't one fixed number: each nudge waits for a **random point
+between 30 and 60 seconds** of idle, picked afresh every time, so the nudges
+never fall on a regular beat. Yolk times its checks to land right on that
+point. Choose your own range, or a single fixed value, with
+[`--threshold`](#using-the-cli) or in Settings.
 
 If you're actually typing, idle never reaches the threshold and Yolk does
 nothing. It only fills the gaps.
@@ -109,8 +115,10 @@ Quit Yolk               ⌘Q
 The icon tells you the state at a glance: **filled yolk** when active, **hollow**
 when idle, **dimmed** when paused.
 
-Settings covers how often Yolk checks, how long you can be idle before it
-steps in, Launch at Login, and your Accessibility permission status.
+Settings covers the most time between checks, the range of idle time before
+Yolk steps in ("Nudge after 30 … up to 60 seconds idle" — set both ends the
+same for a fixed point), Launch at Login, and your Accessibility permission
+status.
 
 Changing a setting mid-run applies immediately without resetting the session.
 Changing "Stop after" restarts the countdown from now — picking "1 hour" two
@@ -122,12 +130,13 @@ hours into a run means one more hour, not instant expiry.
 yolk               # run until Ctrl-C
 yolk -t 8h         # stop automatically after 8 hours
 yolk -v            # log every check and simulated event
+yolk --threshold 20-40   # nudge at a random 20–40s of idle instead
 ```
 
 | Flag | Meaning | Default |
 |------|---------|---------|
-| `-i, --interval <sec>` | seconds between idle checks (5–120) | 30 |
-| `--threshold <sec>` | idle seconds before simulating activity (5–300) | 60 |
+| `-i, --interval <sec>` | most seconds between idle checks (5–120) | 30 |
+| `--threshold <sec>` | idle seconds before simulating activity: a range like `30-60` picks a random point for each nudge, a single number is fixed (5–300) | `30-60` |
 | `-t, --timeout <dur>` | auto-exit after `8h`, `90m`, `45s`, `1d`, or seconds | run forever |
 | `-v, --verbose` | log every check | off |
 
@@ -176,8 +185,8 @@ that the work should stop.
 - While Yolk runs and the screen is unlocked, your display won't sleep and
   auto-lock won't engage — synthetic activity counts as real activity to macOS.
   Locking manually is the walk-away gesture. (This holds as long as your
-  display-sleep timeout is longer than `threshold + interval`; Yolk warns at
-  startup, and in settings, if it isn't.)
+  display-sleep timeout is longer than the top of the threshold range; Yolk
+  warns at startup, and in settings, if it isn't.)
 - Yolk pauses when your session is switched out via fast user switching — it
   never posts input into someone else's session.
 - Closing the lid still sleeps the Mac, same as `caffeinate -i`.
@@ -194,14 +203,16 @@ or mouse input. Yolk resets that timer, so neither app sees you go idle.
 
 | | Goes away after | With Yolk's defaults |
 |---|---|---|
-| Slack | ~10 minutes idle | nudged at 60s, so never |
-| Microsoft Teams | ~5 minutes idle | nudged at 60s, so never |
+| Slack | ~10 minutes idle | nudged within 30–60s, so never |
+| Microsoft Teams | ~5 minutes idle | nudged within 30–60s, so never |
 
-**For Teams, keep threshold plus interval comfortably under five minutes.**
-Yolk acts after up to `threshold + interval` of idle, and the threshold's 300s
-cap was chosen for Slack's 10-minute timer — near the top of that range, Teams
-would mark you away before Yolk stepped in. The defaults (60s + 30s) leave
-plenty of room.
+**For Teams, keep the top of the threshold range under about four and a half
+minutes.** Yolk nudges by the top of the range, and the 300s cap was chosen
+for Slack's 10-minute timer — near that cap, Teams would mark you away before
+Yolk stepped in. The default 30–60s leaves plenty of room.
+
+The random timing also makes Yolk less noticeable: nothing about it ticks on a
+fixed schedule for an activity log to pick out.
 
 Locking your screen still shows you as away in both, by design — see
 [Walking away](#walking-away). Calendar and meeting status are Teams' own and

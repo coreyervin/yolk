@@ -121,11 +121,19 @@ struct ConsoleRendererTests {
         #expect(spy.out == expected)
     }
 
-    @Test("the banner reports the configured threshold and interval as whole seconds")
-    func bannerReflectsConfig() throws {
+    @Test("the banner reports a fixed threshold and the interval as whole seconds")
+    func bannerReflectsFixedThreshold() throws {
         let (renderer, spy) = Self.makeRenderer()
-        renderer.handle(.started(try YolkConfig(interval: 5, threshold: 300)))
-        #expect(spy.out.contains("simulating activity when idle ≥ 300s (checking every 5s)"))
+        renderer.handle(.started(try YolkConfig(interval: 5, threshold: 300...300)))
+        #expect(spy.out.contains("simulating activity when idle ≥ 300s (checking at least every 5s)"))
+    }
+
+    @Test("the banner reports a threshold range as a random point")
+    func bannerReflectsThresholdRange() throws {
+        let (renderer, spy) = Self.makeRenderer()
+        renderer.handle(.started(try YolkConfig(interval: 15, threshold: 20...40)))
+        #expect(spy.out.contains(
+            "simulating activity at a random 20–40s of idle (checking at least every 15s)"))
     }
 
     /// A bare time of day reads as "today", which is wrong for a multi-day run.
@@ -157,13 +165,13 @@ struct ConsoleRendererTests {
 
     // MARK: - Verbose tick logging
 
-    @Test("verbose logs a below-threshold check as real activity")
+    @Test("verbose logs a below-target check with when the next nudge is due")
     func verboseBelowThreshold() throws {
         let (renderer, spy) = Self.makeRenderer(verbose: true)
         renderer.handle(.started(try YolkConfig()))
-        renderer.handle(.checked(idle: 59.7))
+        renderer.handle(.checked(idle: 12.7, nudgeAt: 47.3))
         let stamp = GoldenFile.timeString(Self.pinnedNow, includingDate: false)
-        #expect(spy.out.hasSuffix("[\(stamp)] idle 59s — real activity, nothing to do\n"))
+        #expect(spy.out.hasSuffix("[\(stamp)] idle 12s — next nudge at 47s idle\n"))
     }
 
     @Test("quiet mode logs no per-tick lines")
@@ -171,8 +179,8 @@ struct ConsoleRendererTests {
         let (renderer, spy) = Self.makeRenderer(verbose: false)
         renderer.handle(.started(try YolkConfig()))
         let afterBanner = spy.out
-        renderer.handle(.checked(idle: 12))
-        renderer.handle(.checked(idle: 90))
+        renderer.handle(.checked(idle: 12, nudgeAt: 45))
+        renderer.handle(.checked(idle: 90, nudgeAt: 45))
         renderer.handle(.activitySimulated(total: 1))
         renderer.handle(.paused(.screenLocked))
         renderer.handle(.resumed)
@@ -185,18 +193,18 @@ struct ConsoleRendererTests {
     func simulatedLineReusesTriggeringIdle() throws {
         let (renderer, spy) = Self.makeRenderer(verbose: true)
         renderer.handle(.started(try YolkConfig()))
-        renderer.handle(.checked(idle: 61.2))
+        renderer.handle(.checked(idle: 61.2, nudgeAt: 45))
         renderer.handle(.activitySimulated(total: 7))
         let stamp = GoldenFile.timeString(Self.pinnedNow, includingDate: false)
         #expect(spy.out.hasSuffix("[\(stamp)] idle 61s — simulated activity (#7)\n"))
     }
 
-    @Test("an at-or-above-threshold check logs nothing on its own")
+    @Test("an at-or-above-target check logs nothing on its own")
     func aboveThresholdCheckIsSilent() throws {
         let (renderer, spy) = Self.makeRenderer(verbose: true)
         renderer.handle(.started(try YolkConfig()))
         let afterBanner = spy.out
-        renderer.handle(.checked(idle: 60))
+        renderer.handle(.checked(idle: 45, nudgeAt: 45))
         #expect(spy.out == afterBanner)
     }
 
@@ -245,16 +253,18 @@ struct ConsoleRendererTests {
         #expect(spy.err == "⚠ Could not construct a synthetic input event — Slack may mark you away. Is the window server reachable?\n")
     }
 
+    /// Checks are timed to the nudge, so the worst case is the top of the
+    /// range plus timer slack — the interval no longer adds to it.
     @Test("the display-sleep warning states both the sleep delay and yolk's worst case")
     func displaySleepWarning() throws {
         let (renderer, spy) = Self.makeRenderer()
-        renderer.handle(.started(try YolkConfig(interval: 30, threshold: 60)))
-        renderer.handle(.displaySleepTooSoon(120))
+        renderer.handle(.started(try YolkConfig(interval: 30, threshold: 30...90)))
+        renderer.handle(.displaySleepTooSoon(60))
         #expect(spy.err == """
-            ⚠ Your display sleeps after 2 min — sooner than yolk would act
+            ⚠ Your display sleeps after 1 min — sooner than yolk would act
               with these settings (up to 95s of idle). Once the display sleeps
-              and locks, yolk pauses and Slack will mark you away. Lower --threshold/
-              --interval, or raise display sleep in System Settings → Lock Screen.
+              and locks, yolk pauses and Slack will mark you away. Lower --threshold,
+              or raise display sleep in System Settings → Lock Screen.
 
             """)
     }
@@ -331,7 +341,7 @@ struct ConsoleRendererTests {
     @Test("the display-sleep warning lands between the banner and the tip")
     func warningInterleavesBeforeTip() throws {
         let (renderer, spy) = Self.makeRenderer(invokedBare: true)
-        renderer.handle(.started(try YolkConfig(interval: 30, threshold: 60)))
+        renderer.handle(.started(try YolkConfig(interval: 30, threshold: 30...60)))
         renderer.handle(.displaySleepTooSoon(120))
         renderer.renderStartupTail()
 

@@ -17,10 +17,11 @@ internal static class Usage
         usage: yolk [options]
 
         options:
-          -i, --interval <sec>    seconds between idle checks (default 30, 5–120)
-              --threshold <sec>   idle seconds before simulating activity
-                                  (default 60, 5–300; capped so Slack's ~10 min
-                                  away timer can never be reached)
+          -i, --interval <sec>    most seconds between idle checks (default 30, 5–120)
+              --threshold <sec>   idle seconds before simulating activity, or a
+                                  range like 30-60 to pick a random point each
+                                  time (default 30-60, 5–300; capped so Slack's
+                                  ~10 min away timer can never be reached)
           -t, --timeout <dur>     exit automatically after a duration: 8h, 90m,
                                   45s, 1d, or plain seconds (default: run until Ctrl-C)
           -v, --verbose           log every check and simulated event

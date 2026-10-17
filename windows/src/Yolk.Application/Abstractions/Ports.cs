@@ -17,6 +17,13 @@ public interface IClock
     double MonotonicSeconds();
 }
 
+/// <summary>Where each nudge lands within the threshold range.</summary>
+public interface IRandomSource
+{
+    /// <summary>A random number from 0 up to, but not including, 1.</summary>
+    double NextUnit();
+}
+
 public interface IIdleTimeProvider
 {
     /// <summary>Seconds since the last keyboard or mouse input in this session.</summary>
@@ -78,10 +85,19 @@ public interface ISettingsRepository
     /// </summary>
     StoredSettings Load();
 
-    void Save(double interval, double threshold, StopAfter stopAfter);
+    void Save(double interval, ThresholdRange threshold, StopAfter stopAfter);
 }
 
-public sealed record StoredSettings(double? Interval, double? Threshold, StopAfter? StopAfter);
+/// <summary>
+/// <paramref name="LegacyThreshold"/> is the single value stored before
+/// thresholds became ranges, read so an upgrade keeps the user's setting.
+/// </summary>
+public sealed record StoredSettings(
+    double? Interval,
+    double? ThresholdMin,
+    double? ThresholdMax,
+    double? LegacyThreshold,
+    StopAfter? StopAfter);
 
 /// <summary>Whether Yolk starts when the user signs in.</summary>
 public interface IStartupRegistration

@@ -11,7 +11,7 @@ public class YolkConfigTests
     {
         var config = new YolkConfig();
         Assert.Equal(30, config.Interval);
-        Assert.Equal(60, config.Threshold);
+        Assert.Equal(new ThresholdRange(30, 60), config.Threshold);
         Assert.Null(config.Timeout);
     }
 
@@ -25,7 +25,11 @@ public class YolkConfigTests
     [InlineData(5.0)]
     [InlineData(300.0)]
     public void AcceptsThresholdAtBothRangeBoundaries(double threshold) =>
-        Assert.Equal(threshold, new YolkConfig(threshold: threshold).Threshold);
+        Assert.Equal(ThresholdRange.Fixed(threshold), new YolkConfig(threshold: ThresholdRange.Fixed(threshold)).Threshold);
+
+    [Fact]
+    public void AcceptsTheWidestRange() =>
+        Assert.Equal(new ThresholdRange(5, 300), new YolkConfig(threshold: new ThresholdRange(5, 300)).Threshold);
 
     [Theory]
     [InlineData(4.9)]
@@ -47,9 +51,32 @@ public class YolkConfigTests
     [InlineData(double.NaN)]
     public void RejectsThresholdOutsideTheRange(double threshold)
     {
-        var error = Assert.Throws<ConfigException>(() => new YolkConfig(threshold: threshold));
+        var error = Assert.Throws<ConfigException>(() => new YolkConfig(threshold: ThresholdRange.Fixed(threshold)));
         Assert.Equal(ConfigError.ThresholdOutOfRange, error.Error);
     }
+
+    [Theory]
+    [InlineData(4.0, 60.0)]
+    [InlineData(30.0, 301.0)]
+    public void RejectsARangeWithEitherEndOutOfBounds(double low, double high)
+    {
+        var error = Assert.Throws<ConfigException>(() => new YolkConfig(threshold: new ThresholdRange(low, high)));
+        Assert.Equal(ConfigError.ThresholdOutOfRange, error.Error);
+    }
+
+    [Fact]
+    public void RejectsAnInvertedRange()
+    {
+        var error = Assert.Throws<ConfigException>(() => new YolkConfig(threshold: new ThresholdRange(60, 30)));
+        Assert.Equal(ConfigError.ThresholdInverted, error.Error);
+    }
+
+    [Theory]
+    [InlineData(0.0, 30.0)]
+    [InlineData(0.5, 45.0)]
+    [InlineData(0.9, 57.0)]
+    public void APointIsPlacedProportionallyThroughTheRange(double unit, double expected) =>
+        Assert.Equal(expected, new ThresholdRange(30, 60).PointAt(unit), precision: 9);
 
     [Theory]
     [InlineData(0.0)]

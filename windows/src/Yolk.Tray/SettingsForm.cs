@@ -10,7 +10,8 @@ internal sealed class SettingsForm : Form
 {
     private readonly TrayHandlers _handlers;
     private readonly NumericUpDown _interval;
-    private readonly NumericUpDown _threshold;
+    private readonly NumericUpDown _thresholdMin;
+    private readonly NumericUpDown _thresholdMax;
     private readonly Label _displaySleepWarning;
     private readonly CheckBox _launchAtSignIn;
     private readonly Label _launchAtSignInNote;
@@ -39,9 +40,11 @@ internal sealed class SettingsForm : Form
         _interval = AddStepper(layout, "Check every", "seconds", YolkConfig.MinInterval, YolkConfig.MaxInterval);
         AddCaption(layout, "How often Yolk looks at whether you have gone quiet.");
 
-        _threshold = AddStepper(layout, "Nudge after", "seconds idle", YolkConfig.MinThreshold, YolkConfig.MaxThreshold);
-        AddCaption(layout, "How long you can be idle before Yolk stands in for you. "
-            + "Kept under five minutes so Slack never reaches its away timer.");
+        _thresholdMin = AddStepper(layout, "Nudge after", "seconds idle", YolkConfig.MinThreshold, YolkConfig.MaxThreshold);
+        _thresholdMax = AddStepper(layout, "…up to", "seconds idle", YolkConfig.MinThreshold, YolkConfig.MaxThreshold);
+        AddCaption(layout, "How long you can be idle before Yolk stands in for you — a random point "
+            + "in this range each time, so the nudges never fall on a regular beat. "
+            + "Keep the top under about four and a half minutes for Teams.");
 
         _displaySleepWarning = AddCaption(layout, "", warning: true);
 
@@ -54,7 +57,8 @@ internal sealed class SettingsForm : Form
         footer.Margin = new Padding(0, 16, 0, 0);
 
         _interval.ValueChanged += (_, _) => Change(new UpdateSettings(Interval: (double)_interval.Value));
-        _threshold.ValueChanged += (_, _) => Change(new UpdateSettings(Threshold: (double)_threshold.Value));
+        _thresholdMin.ValueChanged += (_, _) => Change(new UpdateSettings(ThresholdMin: (double)_thresholdMin.Value));
+        _thresholdMax.ValueChanged += (_, _) => Change(new UpdateSettings(ThresholdMax: (double)_thresholdMax.Value));
         _launchAtSignIn.CheckedChanged += (_, _) =>
         {
             if (!_rendering)
@@ -86,7 +90,8 @@ internal sealed class SettingsForm : Form
         {
             var settings = _handlers.GetSettings.Handle(new GetSettings());
             _interval.Value = (decimal)settings.Interval;
-            _threshold.Value = (decimal)settings.Threshold;
+            _thresholdMin.Value = (decimal)settings.Threshold.Min;
+            _thresholdMax.Value = (decimal)settings.Threshold.Max;
 
             var warning = _handlers.Status().DisplaySleepWarning;
             _displaySleepWarning.Visible = warning is not null;

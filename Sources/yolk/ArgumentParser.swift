@@ -53,15 +53,7 @@ enum ArgumentParser {
                 }
                 interval = n
             case "--threshold":
-                guard let n = Double(try value(for: arg)),
-                      YolkConfig.thresholdRange.contains(n)
-                else {
-                    throw ArgumentError(
-                        message:
-                            "--threshold must be 5–300 seconds (above 300 Slack could mark you away)"
-                    )
-                }
-                threshold = n
+                threshold = try parseThreshold(try value(for: arg))
             case "-t", "--timeout":
                 let raw = try value(for: arg)
                 guard let duration = DurationParser.parse(raw) else {
@@ -85,5 +77,23 @@ enum ArgumentParser {
         // YolkConfig stays the only thing entitled to say so.
         let config = try YolkConfig(interval: interval, threshold: threshold, timeout: timeout)
         return .run(Invocation(config: config, verbose: verbose, invokedBare: args.isEmpty))
+    }
+
+    /// `45` for a fixed point, or `30-60` for a random point in that range.
+    /// Both ends are checked against YolkConfig's bounds before the range is
+    /// built, since an inverted ClosedRange traps rather than throwing.
+    static func parseThreshold(_ raw: String) throws -> ClosedRange<TimeInterval> {
+        let outOfRange = ArgumentError(
+            message: "--threshold must be 5–300 seconds (above 300 Slack could mark you away)")
+        let parts = raw.split(separator: "-", omittingEmptySubsequences: false)
+        let values = parts.compactMap { Double($0) }
+        guard (1...2).contains(parts.count), values.count == parts.count,
+              values.allSatisfy({ YolkConfig.thresholdRange.contains($0) }),
+              let low = values.first, let high = values.last
+        else { throw outOfRange }
+        guard low <= high else {
+            throw ArgumentError(message: "--threshold range must run from low to high, e.g. 30-60")
+        }
+        return low...high
     }
 }

@@ -6,16 +6,16 @@ namespace Yolk.TestSupport;
 /// <summary>An in-memory settings store, so tests never touch the registry.</summary>
 public sealed class FakeSettingsRepository : ISettingsRepository
 {
-    public StoredSettings Stored { get; set; } = new(null, null, null);
+    public StoredSettings Stored { get; set; } = new(null, null, null, null, null);
 
     public int SaveCount { get; private set; }
 
     public StoredSettings Load() => Stored;
 
-    public void Save(double interval, double threshold, StopAfter stopAfter)
+    public void Save(double interval, ThresholdRange threshold, StopAfter stopAfter)
     {
         SaveCount++;
-        Stored = new StoredSettings(interval, threshold, stopAfter);
+        Stored = new StoredSettings(interval, threshold.Min, threshold.Max, LegacyThreshold: null, stopAfter);
     }
 }
 

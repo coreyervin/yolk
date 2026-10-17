@@ -25,15 +25,24 @@ struct SettingsView: View {
 
                 LabeledContent("Nudge after") {
                     Stepper(
-                        value: $model.threshold, in: YolkConfig.thresholdRange, step: 5
+                        value: $model.thresholdMin, in: YolkConfig.thresholdRange, step: 5
                     ) {
-                        Text("\(Int(model.threshold)) seconds idle")
+                        Text("\(Int(model.thresholdMin)) seconds idle")
+                            .monospacedDigit()
+                    }
+                }
+                LabeledContent("…up to") {
+                    Stepper(
+                        value: $model.thresholdMax, in: YolkConfig.thresholdRange, step: 5
+                    ) {
+                        Text("\(Int(model.thresholdMax)) seconds idle")
                             .monospacedDigit()
                     }
                 }
                 Text(
-                    "How long you can be idle before Yolk stands in for you. "
-                        + "Kept under five minutes so Slack never reaches its away timer."
+                    "How long you can be idle before Yolk stands in for you — a random point "
+                        + "in this range each time, so the nudges never fall on a regular beat. "
+                        + "Keep the top under about four and a half minutes for Teams."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

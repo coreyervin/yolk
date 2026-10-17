@@ -154,7 +154,8 @@ struct AppModelTests {
     func defaultsFromEmptyStore() {
         let model = Self.make()
         #expect(model.interval == 30)
-        #expect(model.threshold == 60)
+        #expect(model.thresholdMin == 30)
+        #expect(model.thresholdMax == 60)
         #expect(model.stopAfter == .never)
     }
 
@@ -163,13 +164,51 @@ struct AppModelTests {
         let store = SettingsStore.ephemeral()
         let first = Self.make(FakeSystem(), store: store)
         first.interval = 15
-        first.threshold = 90
+        first.thresholdMax = 120
+        first.thresholdMin = 90
         first.stopAfter = .hours4
 
         let second = Self.make(FakeSystem(), store: store)
         #expect(second.interval == 15)
-        #expect(second.threshold == 90)
+        #expect(second.thresholdMin == 90)
+        #expect(second.thresholdMax == 120)
         #expect(second.stopAfter == .hours4)
+    }
+
+    /// Before thresholds were ranges, the app stored one number. An upgrade
+    /// keeps it, as a fixed point.
+    @Test("a pre-range stored threshold carries over as a fixed point")
+    func legacyThresholdMigrates() {
+        let store = SettingsStore.ephemeral()
+        store.writeDouble("threshold", 90)
+        let model = Self.make(FakeSystem(), store: store)
+        #expect(model.thresholdMin == 90)
+        #expect(model.thresholdMax == 90)
+    }
+
+    @Test("an inverted or out-of-range stored range falls back to the default", arguments: [
+        (60.0, 30.0), (1.0, 60.0), (30.0, 900.0),
+    ])
+    func corruptStoredRangeFallsBack(low: Double, high: Double) {
+        let store = SettingsStore.ephemeral()
+        store.writeDouble("thresholdMin", low)
+        store.writeDouble("thresholdMax", high)
+        let model = Self.make(FakeSystem(), store: store)
+        #expect(model.thresholdMin == 30)
+        #expect(model.thresholdMax == 60)
+    }
+
+    /// The two steppers can't produce an inverted range: moving one end past
+    /// the other carries the other along.
+    @Test("moving one end of the range past the other carries it along")
+    func rangeEndsCarryEachOther() {
+        let model = Self.make()
+        model.thresholdMin = 90
+        #expect(model.thresholdMin == 90)
+        #expect(model.thresholdMax == 90)
+        model.thresholdMax = 20
+        #expect(model.thresholdMin == 20)
+        #expect(model.thresholdMax == 20)
     }
 
     /// Preferences can be edited by hand, or written by an older build with
@@ -195,8 +234,10 @@ struct AppModelTests {
         let model = Self.make()
         model.interval = 9999
         #expect(model.interval == YolkConfig.intervalRange.upperBound)
-        model.threshold = 0
-        #expect(model.threshold == YolkConfig.thresholdRange.lowerBound)
+        model.thresholdMin = 0
+        #expect(model.thresholdMin == YolkConfig.thresholdRange.lowerBound)
+        model.thresholdMax = 9999
+        #expect(model.thresholdMax == YolkConfig.thresholdRange.upperBound)
     }
 
     // MARK: - Live reconfiguration
@@ -224,12 +265,13 @@ struct AppModelTests {
     func thresholdAppliesImmediately() {
         let fake = FakeSystem()
         let model = Self.make(fake)
+        model.thresholdMin = 60
         model.setActive(true)
         fake.idle = 45
         model.tickForTesting()
-        #expect(model.activityCount == 0, "45s is below the default 60s threshold")
+        #expect(model.activityCount == 0, "45s is below a fixed 60s threshold")
 
-        model.threshold = 30
+        model.thresholdMax = 30
         model.tickForTesting()
         #expect(model.activityCount == 1)
     }
@@ -314,13 +356,13 @@ struct AppModelTests {
     @Test("the display-sleep warning appears only when sleep beats yolk to it")
     func displaySleepWarning() {
         let fake = FakeSystem()
-        fake.displaySleep = 120  // 60 + 30 + 5 = 95 < 120, so no warning
+        fake.displaySleep = 120  // top of 30–60 + 5 = 65 < 120, so no warning
         let model = Self.make(fake)
         #expect(model.displaySleepWarning == nil)
 
-        fake.displaySleep = 90  // 95 >= 90
+        fake.displaySleep = 60  // 65 >= 60
         model.refreshSystemState()
-        #expect(model.displaySleepWarning == 90)
+        #expect(model.displaySleepWarning == 60)
     }
 
     @Test("no display-sleep setting means no warning")
@@ -333,11 +375,10 @@ struct AppModelTests {
     @Test("tightening the settings clears the display-sleep warning")
     func tighteningClearsWarning() {
         let fake = FakeSystem()
-        fake.displaySleep = 90
+        fake.displaySleep = 60
         let model = Self.make(fake)
-        #expect(model.displaySleepWarning == 90)
-        model.threshold = 30
-        model.interval = 10  // 30 + 10 + 5 = 45 < 90
+        #expect(model.displaySleepWarning == 60)
+        model.thresholdMax = 50  // 50 + 5 = 55 < 60
         #expect(model.displaySleepWarning == nil)
     }
 }

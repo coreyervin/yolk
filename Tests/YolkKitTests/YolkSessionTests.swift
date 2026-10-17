@@ -10,7 +10,9 @@ struct YolkSessionTests {
     private func makeSession(
         _ system: FakeSystem,
         interval: TimeInterval = 30,
-        threshold: TimeInterval = 60,
+        // Fixed by default so the older tests keep their exact numbers; the
+        // random-target suite below passes real ranges.
+        threshold: ClosedRange<TimeInterval> = 60...60,
         timeout: TimeInterval? = nil
     ) throws -> (YolkSession, EventCollector) {
         let session = YolkSession(
@@ -37,7 +39,7 @@ struct YolkSessionTests {
 
         #expect(runState(session) != nil)
         #expect(system.recorder.created.count == 1)
-        #expect(log.events.first == .started(try YolkConfig()))
+        #expect(log.events.first == .started(try YolkConfig(threshold: 60...60)))
     }
 
     @Test("stop returns to stopped, releases the assertion, and reports why")
@@ -72,13 +74,13 @@ struct YolkSessionTests {
     func noSimulationBelowThreshold() throws {
         let system = FakeSystem()
         system.idle = 59
-        let (session, log) = try makeSession(system, threshold: 60)
+        let (session, log) = try makeSession(system, threshold: 60...60)
         try session.start()
 
         session.tick()
 
         #expect(system.postCount == 0)
-        #expect(log.events.contains(.checked(idle: 59)))
+        #expect(log.events.contains(.checked(idle: 59, nudgeAt: 60)))
         #expect(runState(session)?.activityCount == 0)
     }
 
@@ -86,7 +88,7 @@ struct YolkSessionTests {
     func simulatesAtThreshold() throws {
         let system = FakeSystem()
         system.idle = 60
-        let (session, log) = try makeSession(system, threshold: 60)
+        let (session, log) = try makeSession(system, threshold: 60...60)
         try session.start()
 
         session.tick()
@@ -251,13 +253,13 @@ struct YolkSessionTests {
         session.tick()
         let before = try #require(runState(session))
 
-        session.reconfigure(try YolkConfig(interval: 15, threshold: 45))
+        session.reconfigure(try YolkConfig(interval: 15, threshold: 45...45))
 
         let after = try #require(runState(session))
         #expect(after.startedAt == before.startedAt)
         #expect(after.activityCount == before.activityCount)
         #expect(session.config.interval == 15)
-        #expect(session.config.threshold == 45)
+        #expect(session.config.threshold == 45...45)
     }
 
     @Test("a changed timeout restarts the countdown from now")
@@ -327,5 +329,116 @@ struct YolkSessionTests {
         try session.start()
 
         #expect(!log.events.contains { if case .displaySleepTooSoon = $0 { true } else { false } })
+    }
+
+    // MARK: - Random nudge timing
+
+    @Test("each nudge waits for a random point in the threshold range")
+    func targetIsARandomPointInTheRange() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0.5
+        let (session, _) = try makeSession(system, threshold: 30...60)
+
+        try session.start()
+
+        #expect(session.nudgeTarget == 45)
+    }
+
+    @Test("a new random point is chosen after every nudge")
+    func targetIsRechosenAfterEachNudge() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0
+        let (session, _) = try makeSession(system, threshold: 30...60)
+        try session.start()
+        #expect(session.nudgeTarget == 30)
+
+        system.idle = 30
+        system.randomUnit = 0.9
+        session.tick()
+
+        #expect(system.postCount == 1)
+        #expect(session.nudgeTarget == 57)
+    }
+
+    @Test("idle below the random point doesn't nudge, even if past the range's bottom")
+    func belowTheTargetDoesNotNudge() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0.5  // target 45
+        let (session, log) = try makeSession(system, threshold: 30...60)
+        try session.start()
+
+        system.idle = 40
+        session.tick()
+
+        #expect(system.postCount == 0)
+        #expect(log.events.contains(.checked(idle: 40, nudgeAt: 45)))
+    }
+
+    /// The point of the feature: checks land when idle reaches the target, so
+    /// nudges really do fall anywhere in the range rather than on a fixed tick.
+    @Test("the next check is timed for when idle reaches the target")
+    func nextCheckLandsOnTheTarget() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0.5  // target 45
+        let (session, _) = try makeSession(system, interval: 30, threshold: 30...60)
+        try session.start()
+
+        system.idle = 40
+        session.tick()
+        #expect(session.nextCheckDelay == 5)
+
+        system.idle = 2
+        session.tick()
+        #expect(session.nextCheckDelay == 30, "never longer than the interval")
+    }
+
+    @Test("after a nudge, the next check is timed from zero idle")
+    func nextCheckAfterANudge() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0  // first target 30
+        let (session, _) = try makeSession(system, interval: 120, threshold: 30...60)
+        try session.start()
+
+        system.idle = 30
+        system.randomUnit = 0.5  // next target 45
+        session.tick()
+
+        #expect(system.postCount == 1)
+        #expect(session.nextCheckDelay == 45)
+    }
+
+    @Test("a paused session checks back after the interval")
+    func pausedChecksAfterInterval() throws {
+        let system = FakeSystem()
+        system.console = .locked
+        let (session, _) = try makeSession(system, interval: 20, threshold: 30...60)
+        try session.start()
+
+        session.tick()
+
+        #expect(session.nextCheckDelay == 20)
+    }
+
+    @Test("changing the range chooses a new point in it")
+    func reconfiguringTheRangeRechoosesTheTarget() throws {
+        let system = FakeSystem()
+        system.randomUnit = 0.5
+        let (session, _) = try makeSession(system, threshold: 30...60)
+        try session.start()
+
+        session.reconfigure(try YolkConfig(threshold: 100...200))
+
+        #expect(session.nudgeTarget == 150)
+    }
+
+    @Test("the display-sleep warning is measured against the top of the range")
+    func displaySleepUsesTheTopOfTheRange() throws {
+        let system = FakeSystem()
+        system.displaySleep = 64  // 60 + 5 = 65 >= 64
+        let (session, log) = try makeSession(system, threshold: 30...60)
+
+        try session.start()
+
+        #expect(log.count(of: .displaySleepTooSoon(64)) == 1)
     }
 }

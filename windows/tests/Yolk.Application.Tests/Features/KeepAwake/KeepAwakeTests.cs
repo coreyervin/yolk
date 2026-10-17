@@ -28,7 +28,7 @@ public class KeepAwakeTests
     public void StartingWithAConfigRunsWithIt()
     {
         using var host = new TestHost();
-        var config = new YolkConfig(interval: 15, threshold: 30, timeout: 600);
+        var config = new YolkConfig(interval: 15, threshold: ThresholdRange.Fixed(30), timeout: 600);
 
         host.Start(config);
 
@@ -60,7 +60,7 @@ public class KeepAwakeTests
     }
 
     [Fact]
-    public void StartSchedulesATickerAtTheConfiguredInterval()
+    public void StartSchedulesTheFirstCheckASecondLater()
     {
         using var host = new TestHost();
 
@@ -68,7 +68,7 @@ public class KeepAwakeTests
 
         var ticker = Assert.Single(host.Scheduler.Live);
         Assert.Equal(TimeSpan.FromSeconds(1), ticker.DueTime);
-        Assert.Equal(TimeSpan.FromSeconds(15), ticker.Period);
+        Assert.Null(ticker.Period);
     }
 
     [Fact]
@@ -146,8 +146,7 @@ public class KeepAwakeTests
         using var host = new TestHost();
         host.Start(new YolkConfig(timeout: 60));
 
-        var deadline = Assert.Single(host.Scheduler.Live, e => e.Period is null);
-        Assert.Equal(TimeSpan.FromSeconds(60), deadline.DueTime);
+        var deadline = Assert.Single(host.Scheduler.Live, e => e.DueTime == TimeSpan.FromSeconds(60));
         deadline.Fire();
 
         Assert.False(host.Status().IsActive);
@@ -166,7 +165,7 @@ public class KeepAwakeTests
         host.Tick();
         var before = host.Status();
 
-        host.Reconfigure(new YolkConfig(interval: 15, threshold: 45));
+        host.Reconfigure(new YolkConfig(interval: 15, threshold: ThresholdRange.Fixed(45)));
 
         var after = host.Status();
         Assert.Equal(before.StartedAt, after.StartedAt);
@@ -174,14 +173,15 @@ public class KeepAwakeTests
     }
 
     [Fact]
-    public void AChangedIntervalReschedulesTheTicker()
+    public void AChangedIntervalTakesEffectFromTheNextCheck()
     {
         using var host = new TestHost();
         host.Start();
 
         host.Reconfigure(new YolkConfig(interval: 10));
+        Assert.Single(host.Scheduler.Live).Fire();
 
-        Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(host.Scheduler.Live).Period);
+        Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(host.Scheduler.Live).DueTime);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class KeepAwakeTests
         host.Tick();
 
         Assert.True(host.Status().IsActive);
-        Assert.DoesNotContain(host.Scheduler.Live, e => e.Period is null);
+        Assert.DoesNotContain(host.Scheduler.Live, e => e.DueTime == TimeSpan.FromSeconds(60));
         Assert.Null(host.Status().EstimatedEnd);
     }
 

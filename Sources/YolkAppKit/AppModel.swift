@@ -48,7 +48,11 @@ public final class AppModel {
 
     private enum Key {
         static let interval = "interval"
-        static let threshold = "threshold"
+        static let thresholdMin = "thresholdMin"
+        static let thresholdMax = "thresholdMax"
+        /// Before thresholds became ranges. Read once, as a fixed point, so an
+        /// upgrade keeps the user's setting.
+        static let legacyThreshold = "threshold"
         static let stopAfter = "stopAfter"
     }
 
@@ -122,7 +126,8 @@ public final class AppModel {
     // with a stack overflow — the macro rewrites the stored property into a
     // computed one, so the assignment re-enters the setter. Verified.
     @ObservationIgnored private var storedInterval: TimeInterval = YolkConfig.defaultInterval
-    @ObservationIgnored private var storedThreshold: TimeInterval = YolkConfig.defaultThreshold
+    @ObservationIgnored private var storedThresholdMin: TimeInterval = YolkConfig.defaultThreshold.lowerBound
+    @ObservationIgnored private var storedThresholdMax: TimeInterval = YolkConfig.defaultThreshold.upperBound
     @ObservationIgnored private var storedStopAfter: StopAfter = .never
 
     public var interval: TimeInterval {
@@ -139,18 +144,43 @@ public final class AppModel {
         }
     }
 
-    public var threshold: TimeInterval {
+    /// The low end of the nudge range. Raising it past the high end takes the
+    /// high end with it, so the range never inverts.
+    public var thresholdMin: TimeInterval {
         get {
-            access(keyPath: \.threshold)
-            return storedThreshold
+            access(keyPath: \.thresholdMin)
+            return storedThresholdMin
         }
         set {
             let clamped = Self.clamp(newValue, to: YolkConfig.thresholdRange)
-            guard clamped != storedThreshold else { return }
-            withMutation(keyPath: \.threshold) { storedThreshold = clamped }
-            store.writeDouble(Key.threshold, clamped)
-            applyConfig()
+            setThreshold(min: clamped, max: Swift.max(clamped, storedThresholdMax))
         }
+    }
+
+    /// The high end of the nudge range. Lowering it past the low end takes the
+    /// low end with it.
+    public var thresholdMax: TimeInterval {
+        get {
+            access(keyPath: \.thresholdMax)
+            return storedThresholdMax
+        }
+        set {
+            let clamped = Self.clamp(newValue, to: YolkConfig.thresholdRange)
+            setThreshold(min: Swift.min(clamped, storedThresholdMin), max: clamped)
+        }
+    }
+
+    private func setThreshold(min newMin: TimeInterval, max newMax: TimeInterval) {
+        guard newMin != storedThresholdMin || newMax != storedThresholdMax else { return }
+        if newMin != storedThresholdMin {
+            withMutation(keyPath: \.thresholdMin) { storedThresholdMin = newMin }
+            store.writeDouble(Key.thresholdMin, newMin)
+        }
+        if newMax != storedThresholdMax {
+            withMutation(keyPath: \.thresholdMax) { storedThresholdMax = newMax }
+            store.writeDouble(Key.thresholdMax, newMax)
+        }
+        applyConfig()
     }
 
     public var stopAfter: StopAfter {
@@ -185,9 +215,7 @@ public final class AppModel {
         storedInterval = Self.validate(
             defaults.readDouble(Key.interval), in: YolkConfig.intervalRange,
             fallback: YolkConfig.defaultInterval)
-        storedThreshold = Self.validate(
-            defaults.readDouble(Key.threshold), in: YolkConfig.thresholdRange,
-            fallback: YolkConfig.defaultThreshold)
+        (storedThresholdMin, storedThresholdMax) = Self.storedThreshold(defaults)
         storedStopAfter =
             defaults.readString(Key.stopAfter).flatMap(StopAfter.init(rawValue:)) ?? .never
 
@@ -228,7 +256,7 @@ public final class AppModel {
     public func refreshSystemState() {
         hasAccessibilityPermission = environment.hasPostPermission()
         displaySleepWarning = environment.displaySleepSeconds().flatMap {
-            storedThreshold + storedInterval + 5 >= $0 ? $0 : nil
+            YolkSession.displaySleepBeatsYolk(makeConfig(), displaySleep: $0) ? $0 : nil
         }
     }
 
@@ -313,7 +341,7 @@ public final class AppModel {
     private func makeConfig() -> YolkConfig {
         // Both settings are clamped on the way in, so this cannot throw.
         (try? YolkConfig(
-            interval: storedInterval, threshold: storedThreshold,
+            interval: storedInterval, threshold: storedThresholdMin...storedThresholdMax,
             timeout: storedStopAfter.timeout))
             ?? YolkConfig.fallback
     }
@@ -333,6 +361,21 @@ public final class AppModel {
         _ value: TimeInterval, to range: ClosedRange<TimeInterval>
     ) -> TimeInterval {
         min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    /// The stored range, or the user's pre-range single value as a fixed
+    /// point, or the default. A range that is out of bounds or inverted is
+    /// thrown away whole rather than half-trusted.
+    private static func storedThreshold(_ store: SettingsStore) -> (TimeInterval, TimeInterval) {
+        let range = YolkConfig.thresholdRange
+        if let low = store.readDouble(Key.thresholdMin), let high = store.readDouble(Key.thresholdMax),
+           range.contains(low), range.contains(high), low <= high {
+            return (low, high)
+        }
+        if let legacy = store.readDouble(Key.legacyThreshold), range.contains(legacy) {
+            return (legacy, legacy)
+        }
+        return (YolkConfig.defaultThreshold.lowerBound, YolkConfig.defaultThreshold.upperBound)
     }
 
     private static func validate(

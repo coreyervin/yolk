@@ -9,7 +9,7 @@ struct YolkConfigTests {
     func defaults() throws {
         let config = try YolkConfig()
         #expect(config.interval == 30)
-        #expect(config.threshold == 60)
+        #expect(config.threshold == 30...60)
         #expect(config.timeout == nil)
     }
 
@@ -20,7 +20,8 @@ struct YolkConfigTests {
 
     @Test("accepts threshold at both range boundaries", arguments: [5.0, 300.0])
     func acceptsThresholdBoundaries(threshold: TimeInterval) throws {
-        #expect(try YolkConfig(threshold: threshold).threshold == threshold)
+        #expect(try YolkConfig(threshold: threshold...threshold).threshold == threshold...threshold)
+        #expect(try YolkConfig(threshold: 5...300).threshold == 5...300)
     }
 
     @Test("rejects interval outside the range", arguments: [4.9, 121.0, 0.0, -1.0])
@@ -33,7 +34,17 @@ struct YolkConfigTests {
     @Test("rejects threshold outside the range", arguments: [4.9, 301.0, 0.0, -1.0])
     func rejectsThresholdOutOfRange(threshold: TimeInterval) {
         #expect(throws: ConfigError.thresholdOutOfRange(threshold)) {
-            try YolkConfig(threshold: threshold)
+            try YolkConfig(threshold: threshold...threshold)
+        }
+    }
+
+    @Test("rejects a range with either end outside the bounds")
+    func rejectsRangeWithEitherEndOut() {
+        #expect(throws: ConfigError.thresholdOutOfRange(4)) {
+            try YolkConfig(threshold: 4...60)
+        }
+        #expect(throws: ConfigError.thresholdOutOfRange(301)) {
+            try YolkConfig(threshold: 30...301)
         }
     }
 

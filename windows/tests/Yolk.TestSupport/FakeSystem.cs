@@ -9,7 +9,8 @@ namespace Yolk.TestSupport;
 /// real timers, no waiting.
 /// </summary>
 public sealed class FakeSystem :
-    IClock, IIdleTimeProvider, IInputSimulator, ISessionStateProvider, IDisplaySettingsProvider, IPowerRequestService
+    IClock, IIdleTimeProvider, IInputSimulator, ISessionStateProvider, IDisplaySettingsProvider, IPowerRequestService,
+    IRandomSource
 {
     private bool _pendingVerification;
     private long _nextHandle = 1;
@@ -25,6 +26,12 @@ public sealed class FakeSystem :
     public double IdleAfterPost { get; set; } = 0.2;
 
     public double Monotonic { get; set; }
+
+    /// <summary>
+    /// Where each nudge lands within the threshold range: 0 is the bottom,
+    /// just under 1 the top. Pinned so tests know exactly when a nudge is due.
+    /// </summary>
+    public double RandomUnit { get; set; }
     public double? DisplaySleep { get; set; }
     public DateTime WallClock { get; set; } = new(2001, 9, 9, 1, 46, 40, DateTimeKind.Local);
 
@@ -67,6 +74,8 @@ public sealed class FakeSystem :
     public DateTime Now() => WallClock;
 
     public double MonotonicSeconds() => Monotonic;
+
+    public double NextUnit() => RandomUnit;
 
     public PowerRequestHandle Acquire(string reason)
     {

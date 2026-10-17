@@ -23,7 +23,7 @@ internal sealed class ConsoleRenderer
     [
         "yolk -t 8h stops on its own after 8 hours. Also takes 90m, 45s, or 1d.",
         "yolk -v logs every idle check and simulated event, if you want to watch it work.",
-        "yolk --threshold 30 nudges sooner, if Slack still slips to away on you.",
+        "yolk --threshold 20-40 nudges sooner, if Slack or Teams still slips to away.",
         "yolk -i 15 checks more often, for a tighter idle window.",
         "Lock with Win+L when you step away — yolk pauses, so Slack shows you away honestly.",
         "yolk --help lists every option.",
@@ -80,11 +80,11 @@ internal sealed class ConsoleRenderer
                 break;
             case YolkEvent.Checked checkedEvent:
                 _lastCheckedIdle = checkedEvent.Idle;
-                // At or above the threshold the engine goes on to simulate,
-                // and the simulated line reports it — logging here would double up.
-                if (checkedEvent.Idle < _config.Threshold)
+                // At or above the target the engine goes on to simulate, and
+                // the simulated line reports it — logging here would double up.
+                if (checkedEvent.Idle < checkedEvent.NudgeAt)
                 {
-                    VerboseLog($"idle {(int)checkedEvent.Idle}s — real activity, nothing to do");
+                    VerboseLog($"idle {(int)checkedEvent.Idle}s — next nudge at {(int)checkedEvent.NudgeAt}s idle");
                 }
                 break;
             case YolkEvent.ActivitySimulated simulated:
@@ -111,12 +111,12 @@ internal sealed class ConsoleRenderer
                     + "Is yolk running in a desktop session?");
                 break;
             case YolkEvent.DisplaySleepTooSoon tooSoon:
-                var worstCase = _config.Threshold + _config.Interval + 5;
+                var worstCase = _config.Threshold.Max + 5;
                 _err($"""
                     ⚠ Your display sleeps after {(int)(tooSoon.DisplaySleep / 60)} min — sooner than yolk would act
                       with these settings (up to {(int)worstCase}s of idle). Once the display sleeps
-                      and locks, yolk pauses and Slack will mark you away. Lower --threshold/
-                      --interval, or raise "Turn off my screen after" in Settings → System → Power.
+                      and locks, yolk pauses and Slack will mark you away. Lower --threshold,
+                      or raise "Turn off my screen after" in Settings → System → Power.
                     """);
                 break;
             case YolkEvent.Stopped stopped:
@@ -144,7 +144,7 @@ internal sealed class ConsoleRenderer
         _out($"""
             yolk v{YolkVersion.Current} (pid {_pid})
               ✓ system sleep prevented while running
-              ✓ simulating activity when idle ≥ {(int)config.Threshold}s (checking every {(int)config.Interval}s)
+              ✓ simulating activity {NudgeDescription(config.Threshold)} (checking at least every {(int)config.Interval}s)
               • lock your screen (Win+L) when you walk away — yolk pauses while locked
             """);
         if (config.Timeout is { } timeout)
@@ -155,6 +155,12 @@ internal sealed class ConsoleRenderer
             _out($"  • auto-exit at {Format(estimatedEnd, includingDate: timeout >= 86400)}");
         }
     }
+
+    /// <summary>"at a random 30–60s of idle", or "when idle ≥ 45s" for a fixed point.</summary>
+    internal static string NudgeDescription(ThresholdRange threshold) =>
+        threshold.IsFixed
+            ? $"when idle ≥ {(int)threshold.Min}s"
+            : $"at a random {(int)threshold.Min}–{(int)threshold.Max}s of idle";
 
     private void RenderSummary(StopReason reason)
     {

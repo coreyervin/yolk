@@ -30,6 +30,7 @@ public sealed class TestHost : IDisposable
             .AddSingleton<ISessionStateProvider>(System)
             .AddSingleton<IDisplaySettingsProvider>(System)
             .AddSingleton<IPowerRequestService>(System)
+            .AddSingleton<IRandomSource>(System)
             .AddSingleton<ISettingsRepository>(Settings)
             .AddSingleton<IStartupRegistration>(Startup)
             .AddSingleton<IScheduler>(Scheduler)
@@ -67,8 +68,10 @@ public sealed class TestHost : IDisposable
 
     public void ApplyStoredSettings() => Get<ICommandHandler<ApplyStoredSettings>>().Handle(new ApplyStoredSettings());
 
-    public SettingsDto UpdateSettings(double? interval = null, double? threshold = null, StopAfter? stopAfter = null) =>
-        Get<ICommandHandler<UpdateSettings, SettingsDto>>().Handle(new UpdateSettings(interval, threshold, stopAfter));
+    public SettingsDto UpdateSettings(
+        double? interval = null, double? thresholdMin = null, double? thresholdMax = null, StopAfter? stopAfter = null) =>
+        Get<ICommandHandler<UpdateSettings, SettingsDto>>().Handle(
+            new UpdateSettings(interval, thresholdMin, thresholdMax, stopAfter));
 
     public LaunchAtSignInStatus GetLaunchAtSignIn() =>
         Get<IQueryHandler<GetLaunchAtSignIn, LaunchAtSignInStatus>>().Handle(new GetLaunchAtSignIn());

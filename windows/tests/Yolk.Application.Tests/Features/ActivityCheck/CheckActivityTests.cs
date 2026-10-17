@@ -16,7 +16,9 @@ public class CheckActivityTests
         var host = new TestHost();
         host.System.Idle = idle;
         host.System.Console = console;
-        host.Start(new YolkConfig(threshold: threshold, timeout: timeout));
+        // A fixed threshold, so these tests know exactly when a nudge is due;
+        // the random range has its own tests below.
+        host.Start(new YolkConfig(threshold: ThresholdRange.Fixed(threshold), timeout: timeout));
         return host;
     }
 
@@ -30,7 +32,7 @@ public class CheckActivityTests
         host.Tick();
 
         Assert.Equal(0, host.System.PostCount);
-        Assert.Contains(new YolkEvent.Checked(59), host.Events.Events);
+        Assert.Contains(new YolkEvent.Checked(59, NudgeAt: 60), host.Events.Events);
         Assert.Equal(0, host.Status().ActivityCount);
     }
 
@@ -203,5 +205,97 @@ public class CheckActivityTests
         host.Tick();
 
         Assert.True(host.Status().IsActive);
+    }
+
+    // ── Random nudge timing ────────────────────────────────────────────────
+
+    [Fact]
+    public void IdleBelowTheRandomPointDoesntNudgeEvenPastTheRangesBottom()
+    {
+        using var host = new TestHost();
+        host.System.RandomUnit = 0.5; // 30–60 → 45
+        host.Start();
+
+        host.System.Idle = 40;
+        host.Tick();
+
+        Assert.Equal(0, host.System.PostCount);
+        Assert.Contains(new YolkEvent.Checked(40, NudgeAt: 45), host.Events.Events);
+    }
+
+    [Fact]
+    public void ANewRandomPointIsChosenAfterEveryNudge()
+    {
+        using var host = new TestHost();
+        host.System.RandomUnit = 0; // first point 30
+        host.Start();
+
+        host.System.Idle = 30;
+        host.System.RandomUnit = 0.5; // next point 45
+        host.Tick();
+        Assert.Equal(1, host.System.PostCount);
+
+        host.System.Idle = 40;
+        host.Tick();
+        Assert.Equal(1, host.System.PostCount);
+        Assert.Contains(new YolkEvent.Checked(40, NudgeAt: 45), host.Events.Events);
+    }
+
+    /// <summary>
+    /// The point of the feature: each check is timed to land when idle
+    /// reaches the random point, so nudges fall anywhere in the range rather
+    /// than on the next fixed tick.
+    /// </summary>
+    [Fact]
+    public void TheCheckTimerReschedulesItselfForTheNextNudge()
+    {
+        using var host = new TestHost();
+        host.System.RandomUnit = 0.5; // 30–60 → 45
+        host.System.Idle = 40;
+        host.Start();
+
+        Assert.Equal(TimeSpan.FromSeconds(1), Assert.Single(host.Scheduler.Live).DueTime);
+        Assert.Single(host.Scheduler.Live).Fire();
+
+        Assert.Equal(TimeSpan.FromSeconds(5), Assert.Single(host.Scheduler.Live).DueTime);
+    }
+
+    [Fact]
+    public void AfterANudgeTheNextCheckIsTimedFromZeroIdle()
+    {
+        using var host = new TestHost();
+        host.System.RandomUnit = 0; // 30
+        host.System.Idle = 30;
+        host.Start(new YolkConfig(interval: 120));
+        host.System.RandomUnit = 0.5; // next point 45
+
+        Assert.Single(host.Scheduler.Live).Fire();
+
+        Assert.Equal(1, host.System.PostCount);
+        Assert.Equal(TimeSpan.FromSeconds(45), Assert.Single(host.Scheduler.Live).DueTime);
+    }
+
+    [Fact]
+    public void ChecksAreNeverMoreThanTheIntervalApart()
+    {
+        using var host = new TestHost();
+        host.System.Idle = 0;
+        host.Start(new YolkConfig(interval: 10));
+
+        Assert.Single(host.Scheduler.Live).Fire();
+
+        Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(host.Scheduler.Live).DueTime);
+    }
+
+    [Fact]
+    public void APausedSessionChecksBackAfterTheInterval()
+    {
+        using var host = new TestHost();
+        host.System.Console = ConsoleState.Locked;
+        host.Start(new YolkConfig(interval: 20));
+
+        Assert.Single(host.Scheduler.Live).Fire();
+
+        Assert.Equal(TimeSpan.FromSeconds(20), Assert.Single(host.Scheduler.Live).DueTime);
     }
 }

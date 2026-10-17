@@ -27,11 +27,18 @@ internal sealed class SessionRuntime(IPowerRequestService power) : ISessionEvent
     /// <summary>Shown in <c>powercfg /requests</c> while Yolk holds the system awake.</summary>
     public const string PowerRequestReason = "yolk: keeping the PC awake while agents run";
 
-    private readonly List<IDisposable> _timers = [];
+    private IDisposable? _ticker;
+    private IDisposable? _deadline;
 
     public KeepAwakeSession Session { get; } = new(YolkConfig.Default);
 
     public PowerRequestHandle? PowerRequest { get; set; }
+
+    /// <summary>
+    /// How long until the next check, as decided by the last one. Checks are
+    /// timed to land when idle reaches the nudge point.
+    /// </summary>
+    public double NextCheckDelay { get; set; } = 1;
 
     public event Action<YolkEvent>? Emitted;
 
@@ -43,10 +50,17 @@ internal sealed class SessionRuntime(IPowerRequestService power) : ISessionEvent
         }
     }
 
-    public void ReplaceTimers(params IDisposable[] timers)
+    /// <summary>Swaps in the next check; the check timer is one-shot, rescheduled each time.</summary>
+    public void ReplaceTicker(IDisposable ticker)
     {
-        CancelTimers();
-        _timers.AddRange(timers);
+        _ticker?.Dispose();
+        _ticker = ticker;
+    }
+
+    public void ReplaceDeadline(IDisposable? deadline)
+    {
+        _deadline?.Dispose();
+        _deadline = deadline;
     }
 
     /// <summary>
@@ -71,10 +85,9 @@ internal sealed class SessionRuntime(IPowerRequestService power) : ISessionEvent
 
     private void CancelTimers()
     {
-        foreach (var timer in _timers)
-        {
-            timer.Dispose();
-        }
-        _timers.Clear();
+        _ticker?.Dispose();
+        _ticker = null;
+        _deadline?.Dispose();
+        _deadline = null;
     }
 }
