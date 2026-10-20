@@ -62,8 +62,8 @@ Studio too, for NativeAOT:
 
 ```sh
 dotnet publish windows/src/Yolk.Cli -c Release -r win-x64 -o dist/cli
-dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/tray
+dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained false \
+  -p:PublishSingleFile=true -o dist/tray
 ```
 
 Or skip building: every CI run on `main` uploads both executables as the

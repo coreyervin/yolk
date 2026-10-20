@@ -39,8 +39,8 @@ jobs:
       - name: Publish the CLI (NativeAOT) and the tray app
         run: |
           dotnet publish windows/src/Yolk.Cli -c Release -r win-x64 -o dist/cli
-          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained `
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/tray
+          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained false `
+            -p:PublishSingleFile=true -o dist/tray
           New-Item -ItemType Directory dist/stage | Out-Null
           Copy-Item dist/cli/yolk.exe, dist/tray/YolkApp.exe dist/stage/
 

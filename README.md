@@ -235,7 +235,10 @@ Yolk doesn't touch them.
 
 `windows/` holds a C# port: the same engine, a `yolk.exe` CLI with the same
 flags and output, and a system tray app. It needs **Windows 10 or later**, and
-no special permissions.
+no special permissions. The tray app also needs the
+[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0);
+if it's missing, `YolkApp.exe` says so on launch and links to the download.
+The CLI needs nothing.
 
 > **New and lightly tested.** CI builds it on every push, runs its tests, and
 > runs the real `yolk.exe` on a Windows machine to confirm it holds the PC
@@ -261,7 +264,7 @@ scoop install yolk
 ```
 
 That adds **Yolk** to the Start menu and puts `yolk` (the CLI) and `YolkApp`
-(the tray app) on your `PATH`. No admin rights, and nothing else to install.
+(the tray app) on your `PATH`. No admin rights needed.
 
 ```powershell
 scoop update yolk      # update to the latest release
@@ -277,7 +280,7 @@ The bucket picks up each new Yolk release automatically within a few hours.
 - **Download** — unzip `Yolk-X.Y.Z-windows-x64.zip` from the
   [latest release](https://github.com/coreyervin/yolk/releases/latest)
   anywhere; there's no installer. It holds `YolkApp.exe`, the tray app, and
-  `yolk.exe`, the CLI, and neither needs .NET installed. They aren't
+  `yolk.exe`, the CLI; only the tray app needs the .NET runtime. They aren't
   code-signed, so the first launch shows "Windows protected your PC" — choose
   **More info → Run anyway**.
 - **From source** — see [`windows/README.md`](windows/README.md).

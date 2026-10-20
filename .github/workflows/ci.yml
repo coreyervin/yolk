@@ -68,8 +68,8 @@ jobs:
       - name: Publish the CLI (NativeAOT) and the tray app
         run: |
           dotnet publish windows/src/Yolk.Cli -c Release -r win-x64 -o dist/cli
-          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained `
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/tray
+          dotnet publish windows/src/Yolk.Tray -c Release -r win-x64 --self-contained false `
+            -p:PublishSingleFile=true -o dist/tray
 
       # Runs the published yolk.exe for a few seconds against the real Win32
       # calls — the power request, session query, idle timer, and SendInput —
