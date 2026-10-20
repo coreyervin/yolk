@@ -4,7 +4,8 @@ namespace Yolk.Tray;
 
 /// <summary>
 /// The three tray icons, drawn once from the app icon: full colour when
-/// active, greyscale when idle, faded when paused.
+/// active, greyscale when idle, faded when paused. Also the app icon itself,
+/// for windows.
 /// </summary>
 /// <remarks>
 /// The Mac's menu bar glyphs are black template images, which would vanish on
@@ -16,8 +17,20 @@ internal sealed class TrayIcons : IDisposable
     public Icon Idle { get; }
     public Icon Paused { get; }
 
+    /// <summary>
+    /// The exe's icon at every size, so a window's title bar and taskbar
+    /// button match it rather than showing the WinForms default.
+    /// </summary>
+    public Icon App { get; }
+
     public TrayIcons()
     {
+        using (var ico = typeof(TrayIcons).Assembly.GetManifestResourceStream("Yolk.ico")
+            ?? throw new InvalidOperationException("the Yolk.ico resource is missing"))
+        {
+            App = new Icon(ico);
+        }
+
         using var stream = typeof(TrayIcons).Assembly.GetManifestResourceStream("Yolk.png")
             ?? throw new InvalidOperationException("the Yolk.png resource is missing");
         using var source = new Bitmap(stream);
@@ -88,5 +101,6 @@ internal sealed class TrayIcons : IDisposable
         Active.Dispose();
         Idle.Dispose();
         Paused.Dispose();
+        App.Dispose();
     }
 }

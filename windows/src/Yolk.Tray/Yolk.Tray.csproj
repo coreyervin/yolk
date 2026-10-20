@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\Yolk.png" LogicalName="Yolk.png" />
+    <EmbeddedResource Include="Assets\Yolk.ico" LogicalName="Yolk.ico" />
   </ItemGroup>
 
   <ItemGroup>

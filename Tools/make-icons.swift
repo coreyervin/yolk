@@ -3,7 +3,8 @@
 //
 //   swift Tools/make-icons.swift
 //
-// Writes into App/Yolk/Assets.xcassets.
+// Writes into App/Yolk/Assets.xcassets, and the Windows tray app's
+// windows/src/Yolk.Tray/Assets.
 
 import AppKit
 import CoreGraphics
@@ -53,11 +54,43 @@ func makeContext(size: Int) -> CGContext {
     return ctx
 }
 
-func write(_ ctx: CGContext, to url: URL) {
+func pngData(_ ctx: CGContext) -> Data {
     let image = ctx.makeImage()!
     let rep = NSBitmapImageRep(cgImage: image)
     rep.size = NSSize(width: ctx.width, height: ctx.height)
-    try! rep.representation(using: .png, properties: [:])!.write(to: url)
+    return rep.representation(using: .png, properties: [:])!
+}
+
+func write(_ ctx: CGContext, to url: URL) {
+    try! pngData(ctx).write(to: url)
+}
+
+/// Packs PNG images into one .ico. Windows has read PNG-compressed entries
+/// since Vista, and they keep the file small.
+func icoData(_ images: [(size: Int, png: Data)]) -> Data {
+    var data = Data()
+    func append<T: FixedWidthInteger>(_ value: T) {
+        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+    }
+    // ICONDIR: reserved, type 1 (icon), image count.
+    append(UInt16(0))
+    append(UInt16(1))
+    append(UInt16(images.count))
+    var offset = 6 + 16 * images.count
+    for image in images {
+        // ICONDIRENTRY: a dimension of 0 means 256.
+        append(UInt8(image.size >= 256 ? 0 : image.size))
+        append(UInt8(image.size >= 256 ? 0 : image.size))
+        append(UInt8(0))  // no palette
+        append(UInt8(0))  // reserved
+        append(UInt16(1))  // colour planes
+        append(UInt16(32))  // bits per pixel
+        append(UInt32(image.png.count))
+        append(UInt32(offset))
+        offset += image.png.count
+    }
+    for image in images { data.append(image.png) }
+    return data
 }
 
 /// The full-colour app icon: the same line-art egg the menu bar uses, kept in
@@ -200,3 +233,20 @@ for (name, filled) in [("MenuBarActive", true), ("MenuBarIdle", false)] {
 }
 
 print("wrote \(catalog.path)")
+
+// MARK: - Windows
+
+let windowsAssets = root.appendingPathComponent("windows/src/Yolk.Tray/Assets")
+try! fm.createDirectory(at: windowsAssets, withIntermediateDirectories: true)
+
+// Yolk.ico is the exe's icon, shown by Explorer, the Start menu, the taskbar
+// and the Settings window. Every size Windows asks for at 100-200% scaling, so
+// none has to be resampled from a neighbour: 48 is Explorer's default view.
+let icoSizes = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
+try! icoData(icoSizes.map { ($0, pngData(drawAppIcon(size: $0))) })
+    .write(to: windowsAssets.appendingPathComponent("Yolk.ico"))
+
+// Yolk.png is the source the tray icons are drawn from at the taskbar's size.
+write(drawAppIcon(size: 64), to: windowsAssets.appendingPathComponent("Yolk.png"))
+
+print("wrote \(windowsAssets.path)")

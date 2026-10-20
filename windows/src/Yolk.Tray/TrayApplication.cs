@@ -125,7 +125,7 @@ internal sealed class TrayApplication : ApplicationContext
             _settings.Activate();
             return;
         }
-        _settings = new SettingsForm(_handlers);
+        _settings = new SettingsForm(_handlers) { Icon = _icons.App };
         _settings.Show();
     }
 
